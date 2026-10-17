@@ -1,0 +1,290 @@
+[
+  {
+    "id": "grace_01",
+    "type": "grace",
+    "title": "晨露吗哪",
+    "description": "清晨降下白霜般的吗哪，神的恩典日日够用！灵里饱足。",
+    "faithChange": 15,
+    "stepChange": 0
+  },
+  {
+    "id": "grace_02",
+    "type": "grace",
+    "title": "云柱火柱",
+    "description": "日间有云柱遮蔽骄阳，夜间有火柱驱散寒夜黑暗，脚步轻快向前奔走！",
+    "faithChange": 10,
+    "stepChange": 2
+  },
+  {
+    "id": "grace_03",
+    "type": "grace",
+    "title": "以琳十二股清泉",
+    "description": "在干旱旷野来到以琳，遇见十二股清泉和七十棵棕树，畅饮甘泉重得安歇。",
+    "faithChange": 20,
+    "stepChange": 0
+  },
+  {
+    "id": "grace_04",
+    "type": "grace",
+    "title": "如鹰展翅",
+    "description": "专心等候耶和华的必重新得力，奔跑却不困倦，行走却不疲乏！",
+    "faithChange": 15,
+    "stepChange": 3
+  },
+  {
+    "id": "grace_05",
+    "type": "grace",
+    "title": "磐石出水",
+    "description": "在干渴困境中，摩西击打磐石，活水滚滚涌流，满心感恩。",
+    "faithChange": 12,
+    "stepChange": 1
+  },
+  {
+    "id": "grace_06",
+    "type": "grace",
+    "title": "乌鸦叼饼",
+    "description": "在基立溪旁，乌鸦早晚叼来饼和肉，信靠神奇妙的超自然供应。",
+    "faithChange": 18,
+    "stepChange": 0
+  },
+  {
+    "id": "grace_07",
+    "type": "grace",
+    "title": "圣灵甘霖",
+    "description": "晚雨从天降下，浇灌干涸心田，心中涌出仁爱、喜乐与和平的果子。",
+    "faithChange": 25,
+    "stepChange": 0
+  },
+  {
+    "id": "grace_08",
+    "type": "grace",
+    "title": "天使扎营护卫",
+    "description": "耶和华的使者在敬畏他的人四围安营，搭救他们，前行无阻。",
+    "faithChange": 10,
+    "stepChange": 2
+  },
+  {
+    "id": "grace_09",
+    "type": "grace",
+    "title": "五饼二鱼的奇迹",
+    "description": "交出手中微小的奉献，主擘开祝谢，丰丰富富甚至装满十二个篮子！",
+    "faithChange": 20,
+    "stepChange": 1
+  },
+  {
+    "id": "grace_10",
+    "type": "grace",
+    "title": "信德的藤牌",
+    "description": "手握信德的藤牌，熄灭了恶者射来的一切火箭，心怀坦然大有平安。",
+    "faithChange": 15,
+    "stepChange": 0
+  },
+  {
+    "id": "grace_11",
+    "type": "grace",
+    "title": "半夜赞美之歌",
+    "description": "虽在幽暗与禁锢中，如保罗与西拉般唱诗赞美，地大震动锁链尽脱！",
+    "faithChange": 22,
+    "stepChange": 2
+  },
+  {
+    "id": "grace_12",
+    "type": "grace",
+    "title": "约旦河干地",
+    "description": "祭司脚一入水，河水便立起成垒。凭信心跨步踏上干地，大步迈进！",
+    "faithChange": 12,
+    "stepChange": 3
+  },
+  {
+    "id": "grace_13",
+    "type": "grace",
+    "title": "伯特利的天梯",
+    "description": "枕石而卧，梦见通天之梯与天使上去下来，神亲自应许一路相伴！",
+    "faithChange": 20,
+    "stepChange": 1
+  },
+  {
+    "id": "grace_14",
+    "type": "grace",
+    "title": "橄榄枝与平安鸽",
+    "description": "洪水消退，信鸽衔回新拧下来的橄榄叶，新生命的生机与盼望全然显现！",
+    "faithChange": 15,
+    "stepChange": 1
+  },
+  {
+    "id": "grace_15",
+    "type": "grace",
+    "title": "主赐的活水",
+    "description": "在雅各井旁饮得主所赐的活水，直涌到永生，从此永远不渴！",
+    "faithChange": 25,
+    "stepChange": 0
+  },
+  {
+    "id": "grace_16",
+    "type": "grace",
+    "title": "以马忤斯的同伴",
+    "description": "复活的主一路相伴同行，擘饼时眼目豁然明亮，心里火热翻涌！",
+    "faithChange": 18,
+    "stepChange": 2
+  },
+  {
+    "id": "grace_17",
+    "type": "grace",
+    "title": "彩虹之约",
+    "description": "仰望云彩中的绚丽彩虹，默想神的永恒慈爱与不废弃的盟约。",
+    "faithChange": 15,
+    "stepChange": 0
+  },
+  {
+    "id": "grace_18",
+    "type": "grace",
+    "title": "火窑第四人",
+    "description": "在烈火试炼中，竟有相貌宛如神子的第四人同行，连衣裳也没有火燎气味！",
+    "faithChange": 30,
+    "stepChange": 0
+  },
+  {
+    "id": "trial_01",
+    "type": "trial",
+    "title": "旷野怨言",
+    "description": "行路疲乏，口发怨言，思念起埃及的韭菜和大蒜，信心有所受损。",
+    "faithChange": -15,
+    "stepChange": 0
+  },
+  {
+    "id": "trial_02",
+    "type": "trial",
+    "title": "加利利海风暴",
+    "description": "海面忽然狂风大作，波浪拍打船身，因惧怕摇摆，船只随波倒退。",
+    "faithChange": -10,
+    "stepChange": -2
+  },
+  {
+    "id": "trial_03",
+    "type": "trial",
+    "title": "亚玛力人伏击",
+    "description": "行军在后疲乏软弱之处突遭仇敌扰袭，需竭力举手守望，脚步迟延。",
+    "faithChange": -15,
+    "stepChange": -1
+  },
+  {
+    "id": "trial_04",
+    "type": "trial",
+    "title": "罗得之妻的回望",
+    "description": "贪恋所多玛的繁华虚荣，忍不住回首观望，脚步沉滞停滞不前。",
+    "faithChange": -12,
+    "stepChange": -1
+  },
+  {
+    "id": "trial_05",
+    "type": "trial",
+    "title": "玛拉的苦水",
+    "description": "在旷野走了三日找不着水，来到玛拉水却是苦的，百姓心中焦躁沮丧。",
+    "faithChange": -10,
+    "stepChange": 0
+  },
+  {
+    "id": "trial_06",
+    "type": "trial",
+    "title": "客西马尼的困倦",
+    "description": "心灵固然愿意，肉体却软弱了。在这警醒的时刻竟睡着了。",
+    "faithChange": -15,
+    "stepChange": 0
+  },
+  {
+    "id": "trial_07",
+    "type": "trial",
+    "title": "火蛇叮咬",
+    "description": "因路途艰难心中烦躁、出言顶撞，旷野火蛇咬人，需仰望铜蛇悔改。",
+    "faithChange": -20,
+    "stepChange": -1
+  },
+  {
+    "id": "trial_08",
+    "type": "trial",
+    "title": "亚干的贪念",
+    "description": "贪恋示拿美丽的衣服与条金，私藏禁物，全队脚步受到牵累后退。",
+    "faithChange": -15,
+    "stepChange": -2
+  },
+  {
+    "id": "trial_09",
+    "type": "trial",
+    "title": "约拿的逃跑",
+    "description": "企图逃往他施躲避差遣，海上遭遇暴风，被大鱼吞入腹中痛悔自省。",
+    "faithChange": -10,
+    "stepChange": -3
+  },
+  {
+    "id": "trial_10",
+    "type": "trial",
+    "title": "荆棘里的挤累",
+    "description": "今生的思虑、钱财的迷惑把道挤住了，奔走天路渐渐乏力。",
+    "faithChange": -18,
+    "stepChange": 0
+  },
+  {
+    "id": "trial_11",
+    "type": "trial",
+    "title": "探子报恶信",
+    "description": "听见迦南伟人身材高大像巨人，自看如蚱蜢，消化了众人的胆量。",
+    "faithChange": -20,
+    "stepChange": -1
+  },
+  {
+    "id": "trial_12",
+    "type": "trial",
+    "title": "鸡叫的痛悔",
+    "description": "面对围观者的质问，因胆怯退缩不认主，听见鸡叫两遍，出去痛哭。",
+    "faithChange": -25,
+    "stepChange": 0
+  },
+  {
+    "id": "trial_13",
+    "type": "trial",
+    "title": "底马贪爱现今世界",
+    "description": "同工底马因贪爱现今的世界往帖撒罗尼迦去了，留下阵阵叹息与失落。",
+    "faithChange": -12,
+    "stepChange": -1
+  },
+  {
+    "id": "trial_14",
+    "type": "trial",
+    "title": "米利暗的毁谤",
+    "description": "口舌生发嫉妒与毁谤，长了大麻风，关在营外七天不得前行。",
+    "faithChange": -15,
+    "stepChange": -2
+  },
+  {
+    "id": "trial_15",
+    "type": "trial",
+    "title": "流泪谷的干涸",
+    "description": "行经骨干流泪之谷，烈日当头四顾无援，需迫切呼求泉源滋润。",
+    "faithChange": -10,
+    "stepChange": 0
+  },
+  {
+    "id": "trial_16",
+    "type": "trial",
+    "title": "老底嘉的不冷不热",
+    "description": "沉迷于肉体温饱，自以为富足却不知自己是赤身贫穷的，主欲吐出。",
+    "faithChange": -15,
+    "stepChange": 0
+  },
+  {
+    "id": "trial_17",
+    "type": "trial",
+    "title": "以利亚的罗腾树下",
+    "description": "遭耶洗别追杀，逃至旷野罗腾树下求死：“耶和华啊，罢了！求你取我的性命。”",
+    "faithChange": -20,
+    "stepChange": -1
+  },
+  {
+    "id": "trial_18",
+    "type": "trial",
+    "title": "死荫幽谷",
+    "description": "四周黑云密布，行过死荫幽谷，步步惊心，需紧紧抓牢牧人的杖与竿。",
+    "faithChange": -10,
+    "stepChange": -1
+  }
+]

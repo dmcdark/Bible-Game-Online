@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>游戏中心 - Game Hub</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="lobby-container">
+    <header class="lobby-header">
+      <h1>🎮 游戏大厅</h1>
+      <p class="lobby-desc">挑选一款游戏开始挑战，后续将持续更新更多小游戏</p>
+    </header>
+
+    <main class="games-grid">
+      <!-- 游戏卡片 1：天路历程 -->
+      <div class="game-card">
+        <div class="card-badge">多人桌面</div>
+        <div class="card-cover">📜</div>
+        <div class="card-info">
+          <h2>天路历程：圣经棋盘巡礼</h2>
+          <p>基于经典蛇梯棋改编的 70 站多人天路朝圣跑丁游戏，融入圣经答题、卡牌抽取与同格互动机制。</p>
+          <div class="card-tags">
+            <span>1-8 人同台</span>
+            <span>3D 骰子</span>
+            <span>圣经问答</span>
+          </div>
+          <!-- 点击跳转到具体子游戏的 index.html -->
+          <a href="pilgrim-progress/index.html" class="play-btn">进入游戏</a>
+        </div>
+      </div>
+
+      <!-- 游戏卡片 2：七十人：使徒行传之路 -->
+      <div class="game-card">
+        <div class="card-badge">策略探索</div>
+        <div class="card-cover">⛵</div>
+        <div class="card-info">
+          <h2>七十人：使徒行传之路</h2>
+          <p>作为受差派的七十门徒之一，经历两两出征、见证受难复活，在大使命中开辟地中海航路网络，深耕建立教会！</p>
+          <div class="card-tags">
+            <span>双科技树</span>
+            <span>节点航路图</span>
+            <span>回合制策略</span>
+          </div>
+          <a href="seventy-disciples/index.html" class="play-btn">进入见证之旅</a>
+        </div>
+      </div>
+      
+      <!-- 预留占位卡片：展示即将上线的小游戏 -->
+      <div class="game-card placeholder">
+        <div class="card-cover">⏳</div>
+        <div class="card-info">
+          <h2>新游戏筹备中</h2>
+          <p>更多益智互动小游戏正在制作中，敬请期待...</p>
+          <button class="play-btn disabled" disabled>即将推出</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

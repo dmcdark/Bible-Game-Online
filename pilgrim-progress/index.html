@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>天路历程：圣经棋盘巡礼 (Pilgrim's Progress)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- 开局配置弹窗：支持 个人灵修 / 本地同屏 / 在线联机 -->
+  <div id="setup-modal" class="modal-backdrop active">
+    <div class="modal-window setup-window">
+      <h2>天路历程：朝圣启程</h2>
+      
+      <!-- 模式选择选项卡 -->
+      <div class="mode-tabs">
+        <button type="button" class="mode-tab active" data-mode="solo">🧘 个人灵修</button>
+        <button type="button" class="mode-tab" data-mode="local">👨‍👩‍👧‍👦 本地同屏</button>
+        <button type="button" class="mode-tab" data-mode="online">🌐 在线联机</button>
+      </div>
+
+      <!-- 模式 1：个人灵修 (Solo Journey) -->
+      <div id="mode-panel-solo" class="mode-panel active">
+        <p class="subtitle">独自踏上 70 站旷野灵修，记录通关轮次、用时与最终信心值，挑战全服灵修榜！</p>
+        <div class="solo-input-box">
+          <label for="solo-player-name">天路客尊名：</label>
+          <input type="text" id="solo-player-name" value="彼得 (Peter)" maxlength="16">
+        </div>
+        <div class="setup-btn-row">
+          <button type="button" id="start-solo-btn" class="btn-primary">开始个人灵修</button>
+          <button type="button" id="open-solo-rank-btn" class="btn-secondary">🏆 查看灵修排行榜</button>
+        </div>
+      </div>
+
+      <!-- 模式 2：本地同屏 (2~8人) -->
+      <div id="mode-panel-local" class="mode-panel">
+        <p class="subtitle">同一设备轮流投掷骰子（2 ~ 8 人同台团契）</p>
+        <div class="player-count-select">
+          <label for="player-count">朝圣人数：</label>
+          <select id="player-count">
+            <option value="2" selected>2 人</option>
+            <option value="3">3 人</option>
+            <option value="4">4 人</option>
+            <option value="5">5 人</option>
+            <option value="6">6 人</option>
+            <option value="7">7 人</option>
+            <option value="8">8 人</option>
+          </select>
+        </div>
+        <div id="player-names-container" class="player-inputs-grid"></div>
+        <button type="button" id="start-local-btn" class="btn-primary">开始本地同屏</button>
+      </div>
+
+      <!-- 模式 3：在线联机 (Socket.io 房间系统) -->
+      <div id="mode-panel-online" class="mode-panel">
+        <p class="subtitle">异地好友实时同步棋盘，凭 4 位房间号组队同行</p>
+        <div id="online-entry-box">
+          <div class="solo-input-box">
+            <label for="online-player-name">你的昵称：</label>
+            <input type="text" id="online-player-name" value="保罗 (Paul)" maxlength="16">
+          </div>
+          <div class="online-actions-row">
+            <button type="button" id="create-room-btn" class="btn-primary">➕ 创建新房间</button>
+            <div class="join-room-group">
+              <input type="text" id="room-code-input" placeholder="输入4位房间号" maxlength="4">
+              <button type="button" id="join-room-btn" class="btn-secondary">加入房间</button>
+            </div>
+          </div>
+          <div id="online-error-msg" class="error-tip"></div>
+        </div>
+
+        <!-- 房间等候室 -->
+        <div id="online-waiting-room" style="display:none;">
+          <div class="room-code-banner">
+            房间邀请码：<strong id="display-room-code">----</strong>
+          </div>
+          <p class="subtitle">把上方 4 位数字发给朋友即可加入（当前队伍）：</p>
+          <div id="waiting-players-list" class="waiting-list"></div>
+          <button type="button" id="host-start-btn" class="btn-primary" style="display:none;">🚀 房主宣告启程</button>
+          <p id="guest-wait-tip" class="subtitle" style="margin-top:8px;">等待房主点击开始...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 游戏主容器 -->
+  <div class="app-layout">
+    <!-- 左侧：70 格棋盘主区域 -->
+    <main class="board-container">
+      <div class="board-header">
+        <a href="../index.html" class="back-to-lobby-btn">← 返回大厅</a>
+        <h1>天路历程 · 70 站圣经试炼与恩典之径</h1>
+        <button type="button" id="toggle-zoom-btn" class="zoom-toggle-btn" title="切换全局/局部视图">🔍 鸟瞰</button>
+      </div>
+      <!-- 棋盘滑动与拖拽外壳 -->
+      <div id="board-wrapper" class="board-scroll-wrapper">
+        <div id="board" class="board-grid"></div>
+      </div>
+    </main>
+
+    <!-- 右侧：仪表盘与控制中心 -->
+    <aside class="dashboard">
+      <!-- 轮次、计时器与当前行动者 -->
+      <div class="panel round-info">
+        <div>
+          <div class="round-badge">第 <span id="current-round">1</span> 轮</div>
+          <div id="solo-timer-box" class="timer-badge" style="display:none;">⏱️ 用时：<span id="solo-timer">00:00</span></div>
+        </div>
+        <div class="turn-desc">当前行动：<span id="active-player-name">-</span></div>
+      </div>
+
+      <!-- 3D 骰子区域 -->
+      <div class="panel dice-panel">
+        <div class="dice-scene">
+          <div id="dice" class="dice show-1">
+            <div class="dice-face face-1">1</div>
+            <div class="dice-face face-2">2</div>
+            <div class="dice-face face-3">3</div>
+            <div class="dice-face face-4">4</div>
+            <div class="dice-face face-5">5</div>
+            <div class="dice-face face-6">6</div>
+          </div>
+        </div>
+        <button type="button" id="roll-btn" class="btn-action">投掷骰子</button>
+        <div id="roll-status" class="status-tip">等待投掷...</div>
+      </div>
+
+      <!-- 玩家状态榜单 -->
+      <div class="panel roster-panel">
+        <div class="roster-header-row">
+          <h3>天路客名录</h3>
+          <button type="button" id="ingame-rank-btn" class="btn-mini">🏆 灵修榜</button>
+        </div>
+        <div id="player-roster" class="roster-list"></div>
+      </div>
+
+      <!-- 操作与历史日志 -->
+      <div class="panel log-panel">
+        <h3>历程日志</h3>
+        <div id="game-logs" class="logs-stream"></div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- 通用交互弹窗 -->
+  <div id="dialog-modal" class="modal-backdrop">
+    <div class="modal-window dialog-window">
+      <div id="dialog-badge" class="badge">圣经试炼</div>
+      <h3 id="dialog-title">题目加载中</h3>
+      <div id="dialog-content" class="dialog-content"></div>
+      <div id="dialog-actions" class="dialog-actions"></div>
+    </div>
+  </div>
+
+  <!-- 最终排行榜结算弹窗 -->
+  <div id="leaderboard-modal" class="modal-backdrop">
+    <div class="modal-window result-window">
+      <h2 id="leaderboard-title">天路历程已至终点</h2>
+      <p id="leaderboard-subtitle" class="subtitle"></p>
+      <div id="leaderboard-list" class="leaderboard-list"></div>
+      <div class="setup-btn-row" style="margin-top:14px;">
+        <button type="button" id="close-rank-btn" class="btn-secondary" style="display:none;">关闭窗口</button>
+        <button type="button" onclick="location.reload()" class="btn-primary">重新启程</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "totalTiles": 70,
+  "ladders": [
+    { "from": 6, "to": 18, "label": "以诺与神同行" },
+    { "from": 19, "to": 33, "label": "摩西击打磐石出水" },
+    { "from": 37, "to": 52, "label": "以利亚乘旋风升天" },
+    { "from": 44, "to": 62, "label": "加略山十字架救赎" }
+  ],
+  "snakes": [
+    { "from": 24, "to": 11, "label": "巴别塔的骄傲" },
+    { "from": 39, "to": 21, "label": "拜金牛犊的跌倒" },
+    { "from": 54, "to": 38, "label": "旷野探子报恶信" },
+    { "from": 67, "to": 49, "label": "罗得之妻回望所多玛" }
+  ],
+  "sabbathTiles": [10, 25, 42, 60],
+  "eventTiles": [4, 15, 29, 35, 48, 57, 65]
+}

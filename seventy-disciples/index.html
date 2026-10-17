@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>七十人：使徒行传之路</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="game-wrapper">
+    <!-- 顶部状态栏 -->
+    <header class="top-bar">
+      <div class="header-left">
+        <a href="../index.html" class="lobby-back-btn">← 大厅</a>
+        <div class="game-phase-badge" id="phase-badge">阶段一：七十人差派</div>
+        <div class="turn-indicator">第 <span id="turn-num">1</span> 回合</div>
+      </div>
+
+      <!-- 四大核心资源 -->
+      <div class="resource-group">
+        <div class="res-item" title="信徒人口：各地归主门徒总数">
+          👥 信徒: <strong id="res-converts">0</strong>
+        </div>
+        <div class="res-item" title="圣灵信心：用于医病赶鬼与抵挡压制">
+          ✨ 信心: <strong id="res-faith">100</strong>
+        </div>
+        <div class="res-item" title="真理经卷：用于研发神学理解与著述">
+          📜 真理: <strong id="res-truth">20</strong>
+        </div>
+        <div class="res-item" title="爱心物资：用于爱筵、周济与维持教会">
+          🍞 物资: <strong id="res-mercy-goods">50</strong>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <button id="open-coworkers-btn" class="nav-btn">招募同工</button>
+        <button id="open-victory-btn" class="nav-btn">使徒异象</button>
+        <button id="open-tech-btn" class="nav-btn">双轨树</button>
+        <button id="next-turn-btn" class="btn-next-turn">下一回合 ➔</button>
+      </div>
+    </header>
+
+    <!-- 中部主视窗 -->
+    <div class="main-content">
+      <main class="map-viewport" id="map-viewport">
+        <div class="map-container" id="map-container">
+          <canvas id="map-canvas" width="1400" height="900"></canvas>
+          <div id="nodes-layer" class="nodes-layer"></div>
+        </div>
+
+        <div class="map-controls">
+          <button id="btn-zoom-in" class="map-ctrl-btn" title="放大">+</button>
+          <button id="btn-zoom-out" class="map-ctrl-btn" title="缩小">-</button>
+          <button id="btn-zoom-reset" class="map-ctrl-btn" title="还原视角">⟲</button>
+        </div>
+      </main>
+
+      <!-- 右侧控制台 -->
+      <aside class="control-panel">
+        <section class="panel-section location-info">
+          <h3>当前驻足：<span id="cur-loc-name">迦百农</span></h3>
+          <p id="cur-loc-desc" class="loc-desc">加利利海滨重镇...</p>
+          <div class="node-status-bar">
+            <span>民情刚硬度: <strong id="cur-hardiness">30%</strong></span>
+            <span>教会状态: <strong id="cur-church-status">未建立</strong></span>
+          </div>
+
+          <!-- 城邦专属议题挑战栏目 -->
+          <div id="city-challenge-box" class="city-challenge-box" style="display:none;">
+            <div class="challenge-title" id="chal-title">城邦议题</div>
+            <p id="chal-desc" class="chal-desc"></p>
+            <button id="act-solve-challenge" class="act-btn special">进行辩道决胜</button>
+          </div>
+
+          <!-- 宣教行动网格 -->
+          <div class="action-buttons-grid">
+            <button id="act-preach" class="act-btn">传道宣讲 (1 AP)</button>
+            <button id="act-heal" class="act-btn">按手祷告 (1 AP, 15信心)</button>
+            <button id="act-fasting" class="act-btn secondary" title="专注祷告，恢复灵里力量">禁食默想 (1 AP, +15信心)</button>
+            <button id="act-tentmaking" class="act-btn secondary" title="亲手作工自给自足">织帐棚作工 (1 AP, +8物资)</button>
+            <button id="act-build-church" class="act-btn primary">建立家庭教会 (40 物资)</button>
+            <button id="act-send-letter" class="act-btn secondary">发送督责书信 (15 真理)</button>
+          </div>
+        </section>
+
+        <!-- 同工名录 -->
+        <section class="panel-section companions-info">
+          <div class="section-title-row">
+            <h3>宣教队伍与驻守同工</h3>
+            <span class="ap-badge">可用行动力: <strong id="cur-ap">3/3</strong></span>
+          </div>
+          <div id="companion-list" class="companion-list"></div>
+        </section>
+
+        <!-- 使徒纪事日志 -->
+        <section class="panel-section log-section">
+          <h3>使徒纪事</h3>
+          <div id="log-stream" class="log-stream"></div>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <!-- 模态框 1：开局角色选择 -->
+  <div id="modal-intro" class="modal-backdrop active">
+    <div class="modal-window intro-window">
+      <h2>七十人的差派与见证</h2>
+      <p class="scripture-quote">“主又设立七十个人，差遣他们两个两个地，在他前面往自己所要到的各城各地方去。” —— 路加福音 10:1</p>
+      
+      <div class="flashback-box">
+        <h4>【回忆闪回 · 加利利海畔】</h4>
+        <p>你仍清楚记得那日傍晚，面对五千饥渴的人群，主掰开五饼二鱼祝谢，众人尽都吃饱，甚至收拾了十二个满筐。他的恩典日日够用！如今他差派你踏上旷野路途...</p>
+      </div>
+
+      <h3>挑选你的使徒见证者背景：</h3>
+      <div id="template-select-grid" class="template-grid"></div>
+
+      <button id="btn-confirm-start" class="btn-start" disabled>领受差遣 · 两两启程</button>
+    </div>
+  </div>
+
+  <!-- 模态框 2：双科技树界面 -->
+  <div id="modal-tech" class="modal-backdrop">
+    <div class="modal-window tech-window">
+      <div class="modal-header">
+        <h2>属灵双轨发展树</h2>
+        <button class="close-btn" onclick="document.getElementById('modal-tech').classList.remove('active')">✕</button>
+      </div>
+      <div class="tech-trees-container">
+        <div class="tech-column">
+          <h3>📜 属灵真理树 (神学领悟)</h3>
+          <p class="tech-col-tip">消耗【真理点数】研发，增强辩道与化解异端律法之争</p>
+          <div id="truth-tree-list" class="tech-list"></div>
+        </div>
+        <div class="tech-column">
+          <h3>🏛️ 教会事工树 (体制治理)</h3>
+          <p class="tech-col-tip">消耗【真理点数】研发，改善教会行政分工与书信网络</p>
+          <div id="ministry-tree-list" class="tech-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 模态框 3：同工招募界面 -->
+  <div id="modal-coworkers" class="modal-backdrop">
+    <div class="modal-window" style="width:680px;">
+      <div class="modal-header">
+        <h2>招募与委派历史同工</h2>
+        <button class="close-btn" onclick="document.getElementById('modal-coworkers').classList.remove('active')">✕</button>
+      </div>
+      <p style="font-size:0.8rem;color:#554433;margin-bottom:12px;">随着门徒群体的增长与物资储备的丰富，可以招募使徒时代的著名同工随队协助或按立驻守牧养各地教会。</p>
+      <div id="coworker-market-grid" class="coworker-grid"></div>
+    </div>
+  </div>
+
+  <!-- 模态框 4：多维异象与胜利目标界面 -->
+  <div id="modal-victory" class="modal-backdrop">
+    <div class="modal-window" style="width:640px;">
+      <div class="modal-header">
+        <h2>三大使徒异象胜利目标</h2>
+        <button class="close-btn" onclick="document.getElementById('modal-victory').classList.remove('active')">✕</button>
+      </div>
+      <div class="victory-routes-container">
+        <div class="victory-card">
+          <h4>👑 1. 地极见证 · 罗马凯歌（地极开拓胜利）</h4>
+          <p>在帝国的心脏<strong>罗马城建立教会</strong>，且在地中海沿线共建立<strong>至少 5 座教会</strong>，且<strong>总信徒达到 200 人</strong>。</p>
+          <div class="route-progress" id="prog-rome">进度：0/1 罗马教会，0/5 总教会，0/200 信徒</div>
+        </div>
+        <div class="victory-card">
+          <h4>📜 2. 真理柱石 · 信仰守望（神学圣徒胜利）</h4>
+          <p>研发全部 <strong>8 项双轨科技</strong>，且使希腊与小亚细亚三大哲学与宗教重镇（<strong>以弗所、雅典、安提阿</strong>）的刚硬度全部降至 <strong>15% 以下</strong>。</p>
+          <div class="route-progress" id="prog-theology">进度：0/8 科技，三大城尚未完全熔化</div>
+        </div>
+        <div class="victory-card">
+          <h4>🍞 3. 圣徒相通 · 普世合一（大爱周济胜利）</h4>
+          <p>全地<strong>总信徒突破 300 人</strong>，建立跨地中海连结，且当前爱心物资储备达到 <strong>150 点以上</strong>。</p>
+          <div class="route-progress" id="prog-charity">进度：0/300 信徒，0/150 物资</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 节点鼠标悬停状态浮窗 (Tooltip) -->
+  <div id="node-tooltip" class="node-tooltip"></div>
+
+  <!-- 模态框：中央使徒纪事实时叙事弹窗 -->
+  <div id="modal-chronicle" class="modal-backdrop">
+    <div class="modal-window chronicle-window">
+      <div class="chronicle-badge" id="chronicle-badge">使徒见证</div>
+      <h3 id="chronicle-title">纪事载录</h3>
+      <div class="chronicle-body" id="chronicle-content"></div>
+      <div class="chronicle-changes" id="chronicle-changes"></div>
+      <button id="chronicle-confirm-btn" onclick="document.getElementById('modal-chronicle').classList.remove('active')">✦ 阿们 · 记在心上 ✦</button>
+    </div>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
