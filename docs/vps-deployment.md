@@ -2,7 +2,8 @@
 
 适用已确认的环境：Ubuntu 26.04 ARM64、ubuntu 用户、已有 Docker 和宿主机 Nginx。
 公网 443 由 VLESS + REALITY + raw 占用，target 是 127.0.0.1:8443；Nginx 已监听本机 8443。
-复用 /home/ubuntu 下的现有证书，不安装 acme.sh/Certbot，不重新申请证书。
+复用已确认的证书链 /home/ubuntu/fullchain.pem 和私钥 /home/ubuntu/privkey.pem。
+你已确认这张证书覆盖 sse.qinsbro.com 且未过期；不安装 acme.sh/Certbot，不重新申请证书。
 
 **以下命令供你在 VPS 逐段执行，尚未代你操作服务器。任一步报错就暂停，不继续执行后续步骤。**
 镜像构建和自动检查已通过；本教程的 Nginx 配置尚未在你的 VPS 验证，必须执行 nginx -t。
@@ -26,6 +27,8 @@ https://sse.qinsbro.com:443
 ```
 
 不修改现有网站文件，不新增 Nginx 公网 443 监听，不重装 Docker，不改变节点私钥、UUID 或传输方式。
+原网站的 /etc/nginx/sites-available/xxx.com 保留原样，游戏配置新建为 bible-game.conf，
+两者并列监听本机 8443，由 Nginx 按访问域名区分，不需要把游戏配置粘进原网站文件。
 首次只加 8443 的 HTTPS 游戏站点，用完整 https:// 地址访问。
 现有 80 端口及证书续期入口保持原状；确认现有续期方式前，不新增 HTTP 跳转覆盖它。
 
@@ -73,54 +76,34 @@ export GAME_DOMAIN='sse.qinsbro.com'
 export GAME_DIR='/home/ubuntu/bible-game-online'
 export CONFIG_REF='security-hardening'
 export CONFIG_URL="https://raw.githubusercontent.com/dmcdark/Bible-Game-Online/${CONFIG_REF}"
+export GAME_CERT_FILE='/home/ubuntu/fullchain.pem'
+export GAME_KEY_FILE='/home/ubuntu/privkey.pem'
 ```
 
-## 2. 查找 /home/ubuntu 中的现有证书
+这些 export 是当前 SSH 会话的临时变量，换会话后重新执行本段即可。
+后续写入 .env 和 Nginx 配置文件的内容会永久保存；服务运行和重启不依赖这些临时变量。
 
-先看已有 Nginx 使用的域名、证书和私钥路径，不输出私钥内容：
+## 2. 使用已确认的证书路径
+
+路径已经填好，无需再查找或替换占位路径。新游戏的 Nginx 配置最终会使用：
+
+```nginx
+server_name sse.qinsbro.com;
+ssl_certificate /home/ubuntu/fullchain.pem;
+ssl_certificate_key /home/ubuntu/privkey.pem;
+```
+
+上面只是完整站点配置的一部分，不单独执行或粘贴进原网站；第 7、8 节会生成并安装完整的新文件。
+如果想先确认两个文件可读，只运行以下只读命令：
 
 ```bash
-sudo nginx -T 2>/dev/null | grep -E '^[[:space:]]*(server_name|ssl_certificate|ssl_certificate_key)[[:space:]]'
+sudo test -r /home/ubuntu/fullchain.pem && echo '证书可读'
+sudo test -r /home/ubuntu/privkey.pem && echo '私钥可读'
 ```
 
-不确定时再查找 ubuntu 家目录中的候选文件：
-
-```bash
-sudo find /home/ubuntu -maxdepth 6 \
-  -type d \( -name .ssh -o -name .cache -o -name node_modules -o -name .git \) -prune -o \
-  \( -type f -o -type l \) \( -iname '*.pem' -o -iname '*.crt' -o -iname '*.cer' -o -iname '*.key' \) -print
-```
-
-常见完整证书链叫 fullchain.pem/fullchain.cer；私钥可能叫 privkey.pem、private.key 或域名.key。
-下面两个变量必须改成实际的绝对路径，**不能照抄占位路径**：
-
-```bash
-export GAME_CERT_FILE='/home/ubuntu/替换为实际目录/fullchain.pem'
-export GAME_KEY_FILE='/home/ubuntu/替换为实际目录/privkey.pem'
-
-sudo test -r "$GAME_CERT_FILE" && echo '证书可读'
-sudo test -r "$GAME_KEY_FILE" && echo '私钥可读'
-sudo openssl x509 -in "$GAME_CERT_FILE" -noout -subject -issuer -dates -ext subjectAltName
-sudo openssl x509 -in "$GAME_CERT_FILE" -noout -checkhost "$GAME_DOMAIN"
-sudo openssl x509 -in "$GAME_CERT_FILE" -noout -checkend 0
-```
-
-证书须未过期，且覆盖 sse.qinsbro.com 或 *.qinsbro.com。仅覆盖 qinsbro.com 本身不够。
-若现有文件是 Cloudflare Origin Certificate，直连浏览器/下文 curl 可能不信任它；
-这时先确认入口方案，不能用 -k 忽略证书错误。
-
-比较证书和私钥的公钥摘要，不会显示私钥：
-
-```bash
-set -o pipefail
-sudo openssl x509 -in "$GAME_CERT_FILE" -pubkey -noout \
-  | openssl pkey -pubin -outform DER | sha256sum
-sudo openssl pkey -in "$GAME_KEY_FILE" -pubout -outform DER | sha256sum
-```
-
-两条命令都须成功且摘要相同。不匹配、过期、不覆盖域名时暂停。
 不要复制私钥进游戏目录或镜像，不要上传 GitHub，不要把整个 home 目录改成 777。
-最终还会用 nginx -t 验证读取路径和权限。
+第 8 节仍必须执行 nginx -t，确认完整配置、证书读取和证书/私钥配对没有问题，成功后才 reload。
+第 9 节的 HTTPS 请求还会验证浏览器入口所需的证书信任链，不用 -k 忽略错误。
 
 ## 3. DNS 解析
 
@@ -225,6 +208,9 @@ sudo nginx -T 2>/dev/null | grep -E 'include[[:space:]]+/etc/nginx/(conf.d|sites
 备份可能包含原网站敏感配置，只保存在 root 私有目录，不上传仓库。
 
 ## 7. 生成两个 Nginx 文件
+
+本节只在 /home/ubuntu/bible-game-online/generated 下生成文件供查看，不改变正在运行的 Nginx。
+第 8 节才把新游戏文件放入 Nginx 目录；原网站和 Xray 配置不需要编辑。
 
 ```bash
 printf 'domain=%s\ncertificate=%s\nprivate-key-path=%s\n' \
@@ -454,7 +440,7 @@ sudo docker compose stop game
 | pull 报 denied/unauthorized | 镜像名、版本、GHCR 公开可见性 |
 | 13000 不通 | Compose 状态/日志、端口占用、环境变量和数据卷 |
 | Nginx 报 unknown variable/zone | common 文件是否在 http {} 内加载 |
-| 证书错误 | 真实路径、域名覆盖、有效期、配对、公有 CA 信任链 |
+| 证书错误 | /home/ubuntu/fullchain.pem、/home/ubuntu/privkey.pem 的可读性、配对及公有 CA 信任链 |
 | 8443 返回旧站或旧证书 | 游戏配置启用、server_name、TLS SNI |
 | 8443 正常而 443 不通 | DNS、REALITY 转交、云网络；不抢占 443 |
 | 页面可开但不能联机 | PUBLIC_ORIGIN、旧页面缓存、Socket.IO 握手和 Upgrade |
