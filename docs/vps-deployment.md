@@ -212,20 +212,19 @@ sudo nginx -T 2>/dev/null | grep -E 'include[[:space:]]+/etc/nginx/(conf.d|sites
 本节只在 /home/ubuntu/bible-game-online/generated 下生成文件供查看，不改变正在运行的 Nginx。
 第 8 节才把新游戏文件放入 Nginx 目录；原网站和 Xray 配置不需要编辑。
 
-```bash
-printf 'domain=%s\ncertificate=%s\nprivate-key-path=%s\n' \
-  "$GAME_DOMAIN" "$GAME_CERT_FILE" "$GAME_KEY_FILE"
-```
-
-确认三项都有真实值后，整个块执行：
+第 4 节的模板下载完成后，直接复制下面整个块。域名和证书路径已填写好，
+本节会重新设置所需变量，不依赖前面 SSH 会话是否还保留这些值，无需自行替换任何占位路径：
 
 ```bash
+export GAME_DOMAIN='sse.qinsbro.com'
+export GAME_DIR='/home/ubuntu/bible-game-online'
+export GAME_CERT_FILE='/home/ubuntu/fullchain.pem'
+export GAME_KEY_FILE='/home/ubuntu/privkey.pem'
+
 (
   set -eu
-  : "${GAME_DOMAIN:?请先设置游戏域名}"
-  : "${GAME_CERT_FILE:?请先设置真实证书路径}"
-  : "${GAME_KEY_FILE:?请先设置真实私钥路径}"
-  cd "$GAME_DIR"
+  cd /home/ubuntu/bible-game-online
+  mkdir -p generated
   envsubst '${GAME_DOMAIN} ${GAME_CERT_FILE} ${GAME_KEY_FILE}' \
     < templates/nginx-site.conf.template > generated/bible-game.conf
   cp templates/nginx-common.conf generated/bible-game-common.conf
@@ -233,8 +232,17 @@ printf 'domain=%s\ncertificate=%s\nprivate-key-path=%s\n' \
 )
 ```
 
-只替换指定的三个变量，不能使用不带变量名单的 envsubst，否则会清空 Nginx 的 $host、$http_upgrade 等变量。
-输出不能再含未替换的 ${GAME_...}。两份完整配置分别是
+这段里的 ${GAME_DOMAIN} 等是模板变量语法，保持原样复制；实际值已经在上面四行 export 中填好。
+生成结果应该包含：
+
+```nginx
+server_name sse.qinsbro.com;
+ssl_certificate "/home/ubuntu/fullchain.pem";
+ssl_certificate_key "/home/ubuntu/privkey.pem";
+```
+
+输出中的 Nginx 原生变量 $host、$http_upgrade 等应保留，不能变为空，也不能再含未替换的 ${GAME_...}。
+因此不要删掉 envsubst 后的变量名单。两份完整配置分别是
 [公共配置](deploy/nginx-common.conf) 与 [站点模板](deploy/nginx-site.conf.template)。
 
 ## 8. 安装并启用独立游戏站点
