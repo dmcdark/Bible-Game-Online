@@ -95,19 +95,15 @@ compose.yaml 只引用 GAME_IMAGE 指定的已发布镜像，没有本机构建�
 各第三方 Action 已固定为经官方仓库核对的提交 SHA，更新版本时需要主动检查。
 完整操作见 [VPS 部署命令](vps-deployment.md)。
 
-## 现有 REALITY / Nginx 接入
+## 游戏 Nginx 反向代理配置
 
-已知公网 443 为 VLESS + REALITY + raw，target 指向 127.0.0.1:8443。
-现有 Nginx 监听 127.0.0.1:8443 ssl。新增域名的目标链路为：
-
-浏览器 HTTPS → rw-core:443 → Nginx:8443 → 127.0.0.1:13000 → 游戏:3000。
-
-应新增独立 Nginx server_name 和域名证书，保留原网站配置及 rw-core 的监听。
-游戏反代需 HTTP/1.1、Upgrade/Connection WebSocket 头和合适的读超时；
-若以后启用真实 IP 识别，必须由 Nginx 用 $remote_addr 覆写 X-Forwarded-For。
-还需为这个虚拟主机配置适合试玩人数的 HTTP 请求和连接限制；它们不能代替游戏消息限流。
-本次没有修改服务器 Nginx、REALITY、sudoers、防火墙或 DNS。
-新域名经过 REALITY 的实际访问和证书选择必须另行验证。
+- 为游戏配置独立的 `server_name` 和对应的 HTTPS 证书。
+- 将游戏请求转发到 `http://127.0.0.1:13000`，由 Docker 映射到容器内的 `3000` 端口。
+- 使用 HTTP/1.1，并配置 `Upgrade`、`Connection` 请求头及合适的读超时，支持 Socket.IO / WebSocket。
+- 在 `http` 块加载公共配置中的 `map`、`limit_req_zone` 和 `limit_conn_zone`；在游戏站点应用请求及连接限制。
+- 由 Nginx 使用 `$remote_addr` 覆写 `X-Forwarded-For`；应用是否信任代理头需按实际代理来源单独配置。
+- 为游戏设置独立的访问日志和错误日志。HTTP 限流不能代替应用内的游戏消息限流。
+- 启用前执行 `sudo nginx -t`，通过后执行 `sudo systemctl reload nginx`；随后验证游戏 HTTPS、健康接口和 WebSocket 连接。
 
 ## 待执行验证
 
