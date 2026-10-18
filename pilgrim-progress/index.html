@@ -160,12 +160,13 @@
       <div id="leaderboard-list" class="leaderboard-list"></div>
       <div class="setup-btn-row" style="margin-top:14px;">
         <button type="button" id="close-rank-btn" class="btn-secondary" style="display:none;">关闭窗口</button>
-        <button type="button" onclick="location.reload()" class="btn-primary">重新启程</button>
+        <button type="button" data-reload class="btn-primary">重新启程</button>
       </div>
     </div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
+  <script src="/ui-actions.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

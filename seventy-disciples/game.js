@@ -1215,14 +1215,19 @@ function renderCoworkerMarket() {
       <div>
         <p style="font-size:0.7rem;color:#776655;margin-bottom:6px;">门槛：${cw.reqConverts}信徒，${cw.costGoods}物资</p>
         ${!isHired ? 
-          `<button type="button" onclick="hireCoworker('${cw.id}')" ${canHire ? '' : 'disabled'}>召募同工</button>` :
+          `<button type="button" ${canHire ? '' : 'disabled'}>召募同工</button>` :
           (isStationed ? 
-            `<button type="button" onclick="recallCoworker('${cw.id}')">召回随队</button>` :
-            `<button type="button" onclick="stationCoworker('${cw.id}')">驻守当前城邑</button>`
+            `<button type="button">召回随队</button>` :
+            `<button type="button">驻守当前城邑</button>`
           )
         }
       </div>
     `;
+    card.querySelector("button").addEventListener("click", () => {
+      if (!isHired) window.hireCoworker(cw.id);
+      else if (isStationed) window.recallCoworker(cw.id);
+      else window.stationCoworker(cw.id);
+    });
     container.appendChild(card);
   });
 }
@@ -1344,9 +1349,10 @@ function createTechCard(t) {
     <p style="font-size:0.75rem;color:#554433;margin:2px 0;">${t.desc}</p>
     ${t.prereq && !prereqMet ? `<div style="font-size:0.7rem;color:#a00;margin-bottom:4px;">需前置: ${getTechName(t.prereq)}</div>` : ''}
     ${isResearched ? '<span style="color:#2b8a3e;font-weight:bold;">✓ 已领悟</span>' : 
-      `<button type="button" onclick="researchTech('${t.id}',${t.cost})" ${prereqMet && gameState.resources.truth >= t.cost ? '' : 'disabled'}>默想研发</button>`
+      `<button type="button" ${prereqMet && gameState.resources.truth >= t.cost ? '' : 'disabled'}>默想研发</button>`
     }
   `;
+  card.querySelector("button")?.addEventListener("click", () => window.researchTech(t.id, t.cost));
   return card;
 }
 
