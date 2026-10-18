@@ -7,6 +7,9 @@
 
 **以下命令供你在 VPS 逐段执行，尚未代你操作服务器。任一步报错就暂停，不继续执行后续步骤。**
 镜像构建和自动检查已通过；本教程的 Nginx 配置尚未在你的 VPS 验证，必须执行 nginx -t。
+只复制标为 bash 的操作命令；nginx、dotenv、text 代码块是配置内容或说明，不是终端命令。
+依次执行第 1–9 节完成首次上线；第 10–11 节是说明，第 12–13 节是以后维护时使用，
+不要首次安装后又顺手执行回滚。Windows 排查命令仅在标明的 PowerShell 环境执行。
 
 ## 0. 文件清单和访问链路
 
@@ -27,7 +30,8 @@ https://sse.qinsbro.com:443
 ```
 
 不修改现有网站文件，不新增 Nginx 公网 443 监听，不重装 Docker，不改变节点私钥、UUID 或传输方式。
-原网站的 /etc/nginx/sites-available/xxx.com 保留原样，游戏配置新建为 bible-game.conf，
+原网站配置保留原样（你之前展示的文件名用 xxx.com 代称，不需要创建或重命名这个文件），
+游戏配置新建为 bible-game.conf，
 两者并列监听本机 8443，由 Nginx 按访问域名区分，不需要把游戏配置粘进原网站文件。
 首次只加 8443 的 HTTPS 游戏站点，用完整 https:// 地址访问。
 现有 80 端口及证书续期入口保持原状；确认现有续期方式前，不新增 HTTP 跳转覆盖它。
@@ -46,7 +50,14 @@ sudo ss -lntp | grep -E ':(80|443|8443|13000)[[:space:]]'
 ```
 
 预期：ubuntu、aarch64；443 为 rw-core，8443 为 Nginx，13000 尚未被其他应用占用。
-13000 已占用时先暂停，不能直接杀掉监听者。
+首次安装时 13000 已占用要先暂停，不能直接杀掉监听者。
+如果是在继续之前的部署，该端口可能就是已经启动的游戏，先用以下只读命令确认：
+
+```bash
+sudo docker ps --format 'table {{.Names}}\t{{.Ports}}'
+```
+
+确认是本项目的游戏容器后，不要重复新建另一套部署目录或删除原数据卷。
 sudo 可能仍打印 Oracle Cloud Agent 规则警告；须确认命令确实成功，不能删除整个 sudoers 文件。
 
 只缺 Compose 插件时先看软件来源：
@@ -69,19 +80,9 @@ sudo apt-get install docker-compose-v2
 
 以上二选一，不都安装，不卸载现有 Docker；两者都没有 Candidate 时先确认安装来源。
 
-设置后续变量，换 SSH 会话后需重新设置：
-
-```bash
-export GAME_DOMAIN='sse.qinsbro.com'
-export GAME_DIR='/home/ubuntu/bible-game-online'
-export CONFIG_REF='security-hardening'
-export CONFIG_URL="https://raw.githubusercontent.com/dmcdark/Bible-Game-Online/${CONFIG_REF}"
-export GAME_CERT_FILE='/home/ubuntu/fullchain.pem'
-export GAME_KEY_FILE='/home/ubuntu/privkey.pem'
-```
-
-这些 export 是当前 SSH 会话的临时变量，换会话后重新执行本段即可。
-后续写入 .env 和 Nginx 配置文件的内容会永久保存；服务运行和重启不依赖这些临时变量。
+后续各节已各自使用固定路径或在操作块中设置变量，不需要先设置一组全局 export。
+第 7 节生成模板时使用的 export 仅在当前 SSH 会话有效，复制该节整块即可重新设置。
+写入 .env 和 Nginx 配置文件的内容会永久保存，服务运行和重启不依赖这些临时变量。
 
 ## 2. 使用已确认的证书路径
 
@@ -115,13 +116,16 @@ sudo test -r /home/ubuntu/privkey.pem && echo '私钥可读'
 | AAAA（可选） | sse | 只有 IPv6 也可用时填写本 VPS 的公网 IPv6 |
 
 不确定 IPv6 就先不给新记录配置 AAAA，不要动其他域名。
-若使用 Cloudflare，排查阶段可先让该记录 DNS only，不改变节点域名。
+若使用 Cloudflare，只有在现有证书是公共受信任 CA 证书时，才适合切换这个新记录到 DNS only 排查。
+Cloudflare Origin Certificate 不能直接供普通浏览器信任，不要为排查而盲目关闭所需的 CDN 代理。
+现有节点域名保持原状。
 
 ```bash
-getent ahostsv4 "$GAME_DOMAIN"
-getent ahostsv6 "$GAME_DOMAIN"
+getent ahostsv4 sse.qinsbro.com
+getent ahostsv6 sse.qinsbro.com
 ```
 
+没有配置 IPv6 时，第二条可能没有输出，并不代表 IPv4 部署失败。
 CDN 启用时可能解析为 CDN 地址，结合控制台判断。
 不重置防火墙，不启用/关闭 UFW，不额外放行公网 3000、13000、8443。
 
@@ -139,25 +143,41 @@ sudo apt-get update
 sudo apt-get install --no-install-recommends curl gettext-base
 ```
 
-下载配置，已存在的 Compose 先备份：
+下面整个块执行。下载失败会停止；四个文件全部下载成功后才替换本地副本。
+它会先备份已有 Compose，不覆盖已有 .env，也不修改正在运行的容器或 Nginx：
 
 ```bash
-mkdir -p "$GAME_DIR/templates" "$GAME_DIR/generated" "$GAME_DIR/backups"
-chmod 700 "$GAME_DIR/backups"
-cd "$GAME_DIR"
-if [ -f compose.yaml ]; then
-  cp -a compose.yaml "backups/compose.yaml.before-$(date +%Y%m%d-%H%M%S)"
-fi
-curl -fL "$CONFIG_URL/compose.yaml" -o compose.yaml.download
-mv compose.yaml.download compose.yaml
-curl -fL "$CONFIG_URL/docs/deploy/game.env.template" -o templates/game.env.template
-curl -fL "$CONFIG_URL/docs/deploy/nginx-common.conf" -o templates/nginx-common.conf
-curl -fL "$CONFIG_URL/docs/deploy/nginx-site.conf.template" -o templates/nginx-site.conf.template
-if [ ! -f .env ]; then
-  envsubst '${GAME_DOMAIN}' < templates/game.env.template > .env
-fi
-chmod 600 .env
-nano .env
+(
+  set -eu
+  export GAME_DOMAIN='sse.qinsbro.com'
+  CONFIG_URL='https://raw.githubusercontent.com/dmcdark/Bible-Game-Online/security-hardening'
+  mkdir -p /home/ubuntu/bible-game-online/templates /home/ubuntu/bible-game-online/generated /home/ubuntu/bible-game-online/backups
+  cd /home/ubuntu/bible-game-online
+  chmod 700 backups
+  if [ -f compose.yaml ]; then
+    cp -a compose.yaml "backups/compose.yaml.before-$(date +%Y%m%d-%H%M%S)"
+  fi
+  curl -fL "$CONFIG_URL/compose.yaml" -o compose.yaml.download
+  curl -fL "$CONFIG_URL/docs/deploy/game.env.template" -o templates/game.env.template.download
+  curl -fL "$CONFIG_URL/docs/deploy/nginx-common.conf" -o templates/nginx-common.conf.download
+  curl -fL "$CONFIG_URL/docs/deploy/nginx-site.conf.template" -o templates/nginx-site.conf.template.download
+  mv compose.yaml.download compose.yaml
+  mv templates/game.env.template.download templates/game.env.template
+  mv templates/nginx-common.conf.download templates/nginx-common.conf
+  mv templates/nginx-site.conf.template.download templates/nginx-site.conf.template
+  if [ ! -f .env ]; then
+    envsubst '${GAME_DOMAIN}' < templates/game.env.template > .env.download
+    chmod 600 .env.download
+    mv .env.download .env
+  fi
+  chmod 600 .env
+)
+```
+
+下载成功后再打开固定路径检查，不依赖终端当前目录：
+
+```bash
+nano /home/ubuntu/bible-game-online/.env
 ```
 
 .env 的正确内容如下；已有 .env 不自动覆盖，要手动检查：
@@ -179,33 +199,51 @@ GAME_IMAGE=ghcr.io/dmcdark/bible-game-online@sha256:bf96e3253f4c2cb1b43e3778aaba
 ## 5. 拉取镜像并启动
 
 ```bash
-cd "$GAME_DIR"
-sudo docker compose config --quiet
-sudo docker compose pull
-sudo docker compose up -d --no-build --wait --wait-timeout 60
-sudo docker compose ps
-sudo docker compose logs --tail=50 game
-curl --fail --show-error http://127.0.0.1:13000/healthz
+(
+  set -eu
+  cd /home/ubuntu/bible-game-online
+  sudo docker compose config --quiet
+  sudo docker compose pull
+  sudo docker compose up -d --no-build --wait --wait-timeout 60
+  sudo docker compose ps
+  sudo docker compose logs --tail=50 game
+  curl --fail --show-error http://127.0.0.1:13000/healthz
+)
 ```
 
 最后预期返回 {"status":"ok"}。Compose 没有 build 字段，VPS 不需 Node.js/npm，不编译源码。
 只发布 127.0.0.1:13000；容器内为 3000。限制 0.5 CPU、384 MiB、64 个进程，数据使用独立命名卷。
 健康检查显示 unhealthy 不会自动重启容器，进程退出时才由 restart 策略重启。
 denied/unauthorized 时先核对镜像名和 GHCR 可见性；本版本已验证可匿名下载。
+如果旧版 Compose 提示不认识 --wait/--wait-timeout，暂停，先更新匹配现有软件来源的 Compose 插件，
+不要因为参数报错就卸载 Docker、改成在 VPS 构建或停止节点。
 
 ## 6. 备份 Nginx，核对 include
 
 ```bash
-export NGINX_BACKUP="/root/nginx-before-bible-game-$(date +%Y%m%d-%H%M%S).tar.gz"
-sudo tar -C /etc -czf "$NGINX_BACKUP" nginx
-sudo chmod 600 "$NGINX_BACKUP"
-echo "$NGINX_BACKUP"
-sudo nginx -T 2>/dev/null | grep -E 'include[[:space:]]+/etc/nginx/(conf.d|sites-enabled)/'
+(
+  set -eu
+  NGINX_BACKUP="/root/nginx-before-bible-game-$(date +%Y%m%d-%H%M%S).tar.gz"
+  sudo tar -C /etc -czf "$NGINX_BACKUP" nginx
+  sudo chmod 600 "$NGINX_BACKUP"
+  echo "$NGINX_BACKUP"
+  sudo nginx -t
+  sudo nginx -T 2>/dev/null | grep -E 'include[[:space:]]+/etc/nginx/(conf.d|sites-enabled)/'
+)
 ```
 
 确认 http {} 内加载 /etc/nginx/conf.d/*.conf 及 /etc/nginx/sites-enabled/*。
 没有时先暂停，核对真实配置布局；map、limit_req_zone 必须在 http {} 内，不能放入 server {}。
 备份可能包含原网站敏感配置，只保存在 root 私有目录，不上传仓库。
+
+安装前检查是否已经存在同名游戏站点，下面是只读查询，没输出表示没有匹配：
+
+```bash
+sudo nginx -T 2>/dev/null | grep -E '^[[:space:]]*server_name[[:space:]].*sse[.]qinsbro[.]com([;[:space:]]|$)' || true
+```
+
+有输出时先确认是不是之前已安装的游戏配置，不重复创建。遇到 conflicting server name 警告也要暂停，
+即使 nginx -t 最后显示 successful，也不能认定新站点已被采用。
 
 ## 7. 生成两个 Nginx 文件
 
@@ -253,7 +291,7 @@ nginx -t 失败时撤下新软链接和公共配置，不 reload；这段命令�
 ```bash
 (
   set -eu
-  cd "$GAME_DIR"
+  cd /home/ubuntu/bible-game-online
   for target in \
     /etc/nginx/conf.d/bible-game-common.conf \
     /etc/nginx/sites-available/bible-game.conf \
@@ -274,13 +312,18 @@ nginx -t 失败时撤下新软链接和公共配置，不 reload；这段命令�
     echo '配置测试失败，已撤下本次新增启用项；未重载 Nginx。' >&2
     exit 1
   fi
-  sudo systemctl reload nginx
+  if ! sudo systemctl reload nginx; then
+    echo '重载失败：停止后续步骤，查看 Nginx 状态和错误日志，不要改成 restart。' >&2
+    exit 1
+  fi
 )
 ```
 
 模板匹配现有 127.0.0.1:8443 ssl http2 和 [::1]:8443 ssl 的监听选项。
 listen ... http2 在新 Nginx 可能有弃用警告，本次先保持与原站点一致，不顺手改原网站。
 配置错误时不要 restart；先看错误，必要时按第 13 节撤回新增配置。
+如果 install、ln 或 reload 报错，不要重复整段粘贴。先看已有文件和错误日志，
+必要时按第 13 节撤回本教程新增的启用项，再决定下一步。
 
 ## 9. 逐层验证
 
@@ -294,13 +337,13 @@ curl --fail --show-error http://127.0.0.1:13000/healthz
 
 ```bash
 curl --fail --show-error \
-  --resolve "$GAME_DOMAIN:8443:127.0.0.1" \
-  "https://$GAME_DOMAIN:8443/healthz"
+  --resolve 'sse.qinsbro.com:8443:127.0.0.1' \
+  https://sse.qinsbro.com:8443/healthz
 
 curl --fail --show-error \
-  --resolve "$GAME_DOMAIN:8443:127.0.0.1" \
-  -H "Origin: https://$GAME_DOMAIN" \
-  "https://$GAME_DOMAIN:8443/socket.io/?EIO=4&transport=polling"
+  --resolve 'sse.qinsbro.com:8443:127.0.0.1' \
+  -H 'Origin: https://sse.qinsbro.com' \
+  'https://sse.qinsbro.com:8443/socket.io/?EIO=4&transport=polling'
 ```
 
 第一条返回 status:ok，第二条返回以 0{ 开头的 Engine.IO 握手，包含 sid、pingInterval 等。
@@ -309,7 +352,7 @@ curl --fail --show-error \
 ### 公网 443，经 REALITY 到游戏
 
 ```bash
-curl --fail --show-error "https://$GAME_DOMAIN/healthz"
+curl --fail --show-error https://sse.qinsbro.com/healthz
 ```
 
 再用另一台设备浏览器打开：
@@ -351,7 +394,7 @@ WebSocket 内的消息由应用限流，HTTP 限流不等于逐条游戏消息�
 
 ## 11. 沿用现有证书续期
 
-不安装第二套证书工具，确认原管理工具会持续更新 GAME_CERT_FILE/GAME_KEY_FILE 指向的文件。
+不安装第二套证书工具，确认原管理工具会持续更新 /home/ubuntu/fullchain.pem 和 /home/ubuntu/privkey.pem。
 续期成功后应 nginx -t 再 reload Nginx；无需重启游戏容器。
 如果现有工具没有 reload，在其原有的成功部署钩子中配置：
 
@@ -368,7 +411,7 @@ sudo nginx -t && sudo systemctl reload nginx
 ## 12. 查看状态、更新镜像、备份排行榜
 
 ```bash
-cd "$GAME_DIR"
+cd /home/ubuntu/bible-game-online
 sudo docker compose ps
 sudo docker compose logs --tail=100 game
 sudo tail -n 50 /var/log/nginx/bible-game.error.log
@@ -379,26 +422,39 @@ sudo tail -n 20 /var/log/nginx/bible-game.access.log
 更新前让玩家退出，容器重启会清空当前对局。先备份：
 
 ```bash
-cd "$GAME_DIR"
-mkdir -p backups
-chmod 700 backups
-export GAME_BACKUP_STAMP="$(date +%Y%m%d-%H%M%S)"
-cp -a .env "backups/env-$GAME_BACKUP_STAMP"
-cp -a compose.yaml "backups/compose-$GAME_BACKUP_STAMP.yaml"
-sudo docker compose exec -T game node -e \
-  'const fs=require("node:fs");const p="/app/.data/leaderboard.json";process.stdout.write(fs.existsSync(p)?fs.readFileSync(p,"utf8"):"[]\n");' \
-  > "backups/leaderboard-$GAME_BACKUP_STAMP.json"
-chmod 600 "backups/leaderboard-$GAME_BACKUP_STAMP.json"
+(
+  set -eu
+  cd /home/ubuntu/bible-game-online
+  mkdir -p backups
+  chmod 700 backups
+  GAME_BACKUP_STAMP="$(date +%Y%m%d-%H%M%S)"
+  cp -a .env "backups/env-$GAME_BACKUP_STAMP"
+  cp -a compose.yaml "backups/compose-$GAME_BACKUP_STAMP.yaml"
+  sudo docker compose exec -T game node -e \
+    'const fs=require("node:fs");const p="/app/.data/leaderboard.json";process.stdout.write(fs.existsSync(p)?fs.readFileSync(p,"utf8"):"[]\n");' \
+    > "backups/leaderboard-$GAME_BACKUP_STAMP.json.download"
+  chmod 600 "backups/leaderboard-$GAME_BACKUP_STAMP.json.download"
+  mv "backups/leaderboard-$GAME_BACKUP_STAMP.json.download" "backups/leaderboard-$GAME_BACKUP_STAMP.json"
+)
 ```
 
 把新 Actions 成功运行 Summary 中的 GAME_IMAGE 填入 .env，再拉取重启：
 
 ```bash
-nano .env
-sudo docker compose config --quiet
-sudo docker compose pull
-sudo docker compose up -d --no-build --wait --wait-timeout 60
-curl --fail --show-error http://127.0.0.1:13000/healthz
+nano /home/ubuntu/bible-game-online/.env
+```
+
+编辑保存后再执行整个更新块；备份或编辑失败时不继续：
+
+```bash
+(
+  set -eu
+  cd /home/ubuntu/bible-game-online
+  sudo docker compose config --quiet
+  sudo docker compose pull
+  sudo docker compose up -d --no-build --wait --wait-timeout 60
+  curl --fail --show-error http://127.0.0.1:13000/healthz
+)
 ```
 
 只换镜像、不变域名和端口，不需修改或 reload Nginx。
@@ -409,10 +465,19 @@ curl --fail --show-error http://127.0.0.1:13000/healthz
 镜像回滚：在 .env 把 GAME_IMAGE 改回旧成功版本，保留正确域名，再执行：
 
 ```bash
-cd "$GAME_DIR"
-nano .env
-sudo docker compose pull
-sudo docker compose up -d --no-build --wait --wait-timeout 60
+nano /home/ubuntu/bible-game-online/.env
+```
+
+保存后执行：
+
+```bash
+(
+  set -eu
+  cd /home/ubuntu/bible-game-online
+  sudo docker compose config --quiet
+  sudo docker compose pull
+  sudo docker compose up -d --no-build --wait --wait-timeout 60
+)
 ```
 
 数据卷不会随镜像更新删除。不要 docker compose down -v 或 docker volume prune。
@@ -421,20 +486,27 @@ sudo docker compose up -d --no-build --wait --wait-timeout 60
 撤下新 Nginx 站点时，只操作本教程新增文件，不整体替换 /etc/nginx：
 
 ```bash
-if sudo test -L /etc/nginx/sites-enabled/bible-game.conf; then
-  sudo unlink /etc/nginx/sites-enabled/bible-game.conf
-fi
-if sudo test -f /etc/nginx/conf.d/bible-game-common.conf; then
-  sudo mv /etc/nginx/conf.d/bible-game-common.conf \
-    "/etc/nginx/bible-game-common.disabled-$(date +%Y%m%d-%H%M%S)"
-fi
-sudo nginx -t && sudo systemctl reload nginx
+(
+  set -eu
+  if sudo test -L /etc/nginx/sites-enabled/bible-game.conf; then
+    sudo unlink /etc/nginx/sites-enabled/bible-game.conf
+  elif sudo test -e /etc/nginx/sites-enabled/bible-game.conf; then
+    echo '停止：启用项不是本教程创建的软链接，请先检查。' >&2
+    exit 1
+  fi
+  if sudo test -f /etc/nginx/conf.d/bible-game-common.conf; then
+    sudo mv /etc/nginx/conf.d/bible-game-common.conf \
+      "/etc/nginx/bible-game-common.disabled-$(date +%Y%m%d-%H%M%S)"
+  fi
+  sudo nginx -t
+  sudo systemctl reload nginx
+)
 ```
 
 如需暂停游戏：
 
 ```bash
-cd "$GAME_DIR"
+cd /home/ubuntu/bible-game-online
 sudo docker compose stop game
 ```
 
