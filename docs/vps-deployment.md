@@ -1,7 +1,7 @@
 # Ubuntu 部署命令：sse.qinsbro.com
 
 除特别注明外，命令均在 VPS 的 ubuntu 用户 SSH 终端执行。逐块执行，报错就暂停。
-首次部署按第 1–9 节；第 10–13 节仅在维护时使用。已完成的步骤不用重做，已上线不要重复安装站点。
+首次部署按第 1–9 节；第 10–14 节仅在维护时使用。已完成的步骤不用重做，已上线不要重复安装站点。
 只执行 bash 代码块；nginx、dotenv 代码块是查看或编辑文件时对照的内容。
 
 ## 1. 检查环境
@@ -372,3 +372,68 @@ sudo docker compose stop game
 ```
 
 撤下站点后，sites-available/bible-game.conf 仍保留；重新安装前先检查并备份，不直接重复第 8 节。
+
+## 14. 发布版本记录
+
+### 哪些已自动记录
+
+- Git 保存源码提交；Actions Summary 写入构建的代码提交 SHA 和镜像标签。
+- 镜像内的 `org.opencontainers.image.revision` 标签保存构建时的代码提交 SHA。
+- `docker push` 日志包含镜像 digest，但当前工作流没有把 digest 汇总到 Summary，也没有自动创建 GitHub Release。
+- Git 不保存 VPS 排行榜、环境文件或实际部署版本。文档中的备份命令必须在 VPS 手动执行，当前没有自动备份任务。
+- 文档提交不触发构建，因此 GitHub 分支的最新提交不一定是当前镜像使用的代码提交；以镜像标签和对应 Actions 为准。
+
+### 在 VPS 记录当前运行版本
+
+在更新前执行一次，成功更新并验证后再执行一次。整块复制到 VPS 的 SSH 终端；
+命令只读取运行容器和本地镜像信息，写入私有 backups 目录，不重启服务、不构建、不备份排行榜。
+
+```bash
+(
+  set -eu
+  umask 077
+  cd /home/ubuntu/bible-game-online
+  mkdir -p backups
+  chmod 700 backups
+  GAME_CONTAINER_ID="$(sudo docker compose ps -q game)"
+  test -n "$GAME_CONTAINER_ID"
+  GAME_IMAGE_ID="$(sudo docker inspect --format '{{.Image}}' "$GAME_CONTAINER_ID")"
+  GAME_SOURCE_SHA="$(sudo docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$GAME_IMAGE_ID")"
+  GAME_REPO_DIGESTS="$(sudo docker image inspect --format '{{json .RepoDigests}}' "$GAME_IMAGE_ID")"
+  test -n "$GAME_SOURCE_SHA"
+  test "$GAME_SOURCE_SHA" != '<no value>'
+  test "$GAME_REPO_DIGESTS" != '[]'
+  test "$GAME_REPO_DIGESTS" != 'null'
+  GAME_RECORD="backups/release-$(date -u +%Y%m%dT%H%M%S)-$$.txt"
+  {
+    date -u '+recorded_at=%Y-%m-%dT%H:%M:%SZ'
+    printf 'source_commit=%s\n' "$GAME_SOURCE_SHA"
+    printf 'image_id=%s\n' "$GAME_IMAGE_ID"
+    printf 'repo_digests=%s\n' "$GAME_REPO_DIGESTS"
+    sudo docker inspect --format 'configured_image={{.Config.Image}}' "$GAME_CONTAINER_ID"
+  } > "$GAME_RECORD.download"
+  mv "$GAME_RECORD.download" "$GAME_RECORD"
+  cat "$GAME_RECORD"
+)
+```
+
+`repo_digests` 中的 `ghcr.io/...@sha256:...` 是可用于 .env 的精确镜像引用；
+`image_id` 是本地镜像 ID，不能代替仓库 digest 来拉取镜像。
+记录文件格式说明见 [Docker image inspect](https://docs.docker.com/reference/cli/docker/image/inspect/)。
+
+### 更新与回滚时还要做什么
+
+1. 更新前按 [部署命令第 12 节](vps-deployment.md#12-备份并更新镜像) 备份 .env、Compose 和排行榜，再修改 GAME_IMAGE。
+2. 保留上一版本在 GHCR 的镜像和 VPS 上的本地镜像，不执行镜像清理；版本记录本身不会防止镜像被删除。
+3. 需要不依赖 GHCR 的离线回滚时，可另外导出旧镜像；这会占用磁盘，当前未自动执行。
+4. 将数据备份安全复制到另一台设备；只存在同一 VPS 上的备份不能防范整机丢失。
+5. 回滚代码按第 13 节把 GAME_IMAGE 改回记录的旧仓库 digest。仅更换镜像不会恢复旧排行榜；数据恢复需停止写入，保留当前数据，再核对格式并恢复备份。
+
+现有已发布镜像的对应关系（源码版本，不是最新文档版本）：
+
+| 项目 | 值 |
+| --- | --- |
+| 代码提交 | `6305b4006259920444eeea6cebfd9a13d797b577` |
+| 镜像标签 | `ghcr.io/dmcdark/bible-game-online:build-39085806588-1` |
+| 镜像 digest | `sha256:bf96e3253f4c2cb1b43e3778aaba3d89c1e2ca2da47e1554d99841c3a931622f` |
+| Actions | https://github.com/dmcdark/Bible-Game-Online/actions/runs/39085806588 |
