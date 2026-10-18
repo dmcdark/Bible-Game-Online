@@ -121,7 +121,7 @@ jobs:
             echo '```'
             echo
             echo 'On first publication, check the GHCR package visibility. Public repository does not automatically mean public package.'
-            echo 'VPS instructions: docs/vps-deployment.md'
+            echo 'Security notes: docs/security-and-deployment.md'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Test container logs
