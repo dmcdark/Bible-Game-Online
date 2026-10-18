@@ -1,6 +1,6 @@
 services:
   game:
-    image: ${GAME_IMAGE:?Copy the versioned image from the successful GitHub Actions run into .env}
+    image: ${GAME_IMAGE:?Set GAME_IMAGE to a published channel tag or version in .env}
     init: true
     restart: unless-stopped
     ports:

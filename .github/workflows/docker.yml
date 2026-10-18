@@ -36,6 +36,11 @@ jobs:
         run: |
           echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
           echo "tag=build-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+          case "$GITHUB_REF" in
+            refs/heads/main) echo 'channel=latest' >> "$GITHUB_OUTPUT" ;;
+            refs/heads/security-hardening) echo 'channel=security-hardening' >> "$GITHUB_OUTPUT" ;;
+            *) echo 'Only main and security-hardening can publish images.' >&2; exit 1 ;;
+          esac
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
@@ -105,20 +110,28 @@ jobs:
         env:
           IMAGE_NAME: ${{ steps.image.outputs.name }}
           IMAGE_TAG: ${{ steps.image.outputs.tag }}
+          IMAGE_CHANNEL: ${{ steps.image.outputs.channel }}
         shell: bash
         run: |
           image_ref="$IMAGE_NAME:$IMAGE_TAG"
           docker tag "$LOCAL_IMAGE" "$image_ref"
           docker push "$image_ref"
+          channel_ref="$IMAGE_NAME:$IMAGE_CHANNEL"
+          docker tag "$LOCAL_IMAGE" "$channel_ref"
+          docker push "$channel_ref"
           {
             echo '## ARM64 image published'
             echo
             echo "Source commit: \`$GITHUB_SHA\`"
             echo
-            echo 'Copy this line into the VPS .env file:'
+            echo 'Set GAME_IMAGE once to follow this branch on future pulls:'
             echo '```dotenv'
-            echo "GAME_IMAGE=$image_ref"
+            echo "GAME_IMAGE=$channel_ref"
             echo '```'
+            echo
+            echo "Versioned image for pinning or rollback: \`$image_ref\`"
+            echo
+            echo 'Run docker compose pull, then docker compose up -d --no-build --wait --wait-timeout 60 to apply an update.'
             echo
             echo 'On first publication, check the GHCR package visibility. Public repository does not automatically mean public package.'
             echo 'Security notes: docs/security-and-deployment.md'
