@@ -220,6 +220,9 @@ denied/unauthorized 时先核对镜像名和 GHCR 可见性；本版本已验证
 
 ## 6. 备份 Nginx，核对 include
 
+本节的 bash 命令都在 **VPS 的 SSH 终端**运行，不是在本地 Windows 终端运行。
+先复制执行下面整个块：它只创建备份并读取、检查现有配置，不修改 Nginx 配置，也不重载服务。
+
 ```bash
 (
   set -eu
@@ -232,9 +235,29 @@ denied/unauthorized 时先核对镜像名和 GHCR 可见性；本版本已验证
 )
 ```
 
-确认 http {} 内加载 /etc/nginx/conf.d/*.conf 及 /etc/nginx/sites-enabled/*。
-没有时先暂停，核对真实配置布局；map、limit_req_zone 必须在 http {} 内，不能放入 server {}。
 备份可能包含原网站敏感配置，只保存在 root 私有目录，不上传仓库。
+
+上面的 grep 只用来查找 include 行，不能证明它们位于哪个括号内。接着在 VPS 运行下面这条只读命令：
+
+```bash
+sudo cat /etc/nginx/nginx.conf
+```
+
+在输出中找到 `http {`，确认下面两条 include 位于这个 `http` 块的括号范围内。
+下面是**需要查看的配置示例，不是终端命令，也不需要复制进去替换现有配置**：
+
+```nginx
+http {
+    # 其他现有配置……
+    include /etc/nginx/conf.d/*.conf;
+    include /etc/nginx/sites-enabled/*;
+}
+```
+
+两条 include 都在 `http { ... }` 内，且前面的 `sudo nginx -t` 显示 `syntax is ok` 和
+`test is successful`，才能继续下一步。已有这两条 include 时无需编辑主配置。
+找不到任意一条、无法确认括号范围，或检查报错时先暂停，核对实际配置布局，不要自行补写或覆盖原配置。
+游戏公共配置中的 `map`、`limit_req_zone` 必须由 `http` 块加载，不能放进 `server` 块。
 
 安装前检查是否已经存在同名游戏站点，下面是只读查询，没输出表示没有匹配：
 
