@@ -35,6 +35,24 @@
 - GitHub Actions 发布前执行规则测试、接口与 Socket.IO 检查以及依赖高危/严重漏洞检查；
   这些检查不能代替双浏览器界面验证、渗透测试或负载测试。
 
+## 可继续优化的项目（尚未实现）
+
+| 项目 | 成本较低的做法 | 限制与取舍 |
+| --- | --- | --- |
+| 容器出站访问 | 先确认应用所需出站连接，再针对游戏容器网络限制宿主机、内网和云元数据访问 | 优先考虑；需要核对 VPS 实际路由和 Docker 防火墙，不套用全局规则，以免影响节点；仍共享宿主机内核 |
+| 四位房间号 | 保留房间号，增加可选的随机邀请凭据和入房失败限流 | 开启私密邀请的房间需要凭据；不能只在前端隐藏编号，服务端必须验证 |
+| 玩家断线导致整局结束 | 增加短时间重连和随机恢复凭据 | 先保留单实例；需要处理座位冒领、超时和回合恢复，属于游戏行为修改 |
+| 单人成绩不可信 | 先在榜单标明“浏览器上报成绩” | 成本最低，但不防作弊；可信成绩需要服务器维护单人对局状态并判定结果 |
+| 答案公开 | 联机改为只下发当前题目，服务器保留答案，结算后才揭示 | 需要同步调整前端；公开仓库中的相同题库仍可查询，客户端离线模式也无法真正保密 |
+| Origin 不能认证玩家 | 私密房间采用邀请凭据；只有需要稳定身份或权限时再加入登录 | 公开匿名游戏无需为了 CORS 增加账号系统；登录也不能独自阻止刷请求 |
+| 客户端日志可伪造 | 服务端根据已接受的动作生成重要对局日志 | 当前纯文本处理已降低脚本注入风险；主要改善日志可信度，不改变规则 |
+| 共享来源限额 | 先按小规模玩家验证，再设计准确的代理来源识别 | REALITY 已把来源变成本机地址时，仅信任 Docker 网桥不能恢复真实 IP，不能直接放开信任所有代理头 |
+| 重启丢失房间、只能单实例 | 小规模先保留单实例，在无人对局时更新 | 需要恢复对局时再做状态持久化；多实例还需共享状态、原子操作及连接路由，不是只加 Redis 即可 |
+| 自动检查覆盖有限 | 先完成双设备对局和实际代理入口验证，再安排受控负载测试 | 任何自动测试都不能保证不存在漏洞；不在正在使用的 VPS 上直接压测 |
+
+建议先做发布记录、备份和少量玩家验证，再处理出站限制、邀请凭据及重连。
+以上是改进方案，不代表已经修改代码或 VPS。需要独立内核隔离时，应使用另一台 VM/VPS；Docker 本身不是这一层隔离。
+
 ## 运行配置
 
 | 环境变量 | 默认值 / 含义 |
@@ -42,12 +60,11 @@
 | PORT | 3000 |
 | HOST | 127.0.0.1；Dockerfile 中设为 0.0.0.0，以便容器端口转发 |
 | NODE_ENV | production 时必须设置 PUBLIC_ORIGIN |
-| PUBLIC_ORIGIN | 例如 https://sse.com；只接受不带路径、凭据、查询和片段的来源地址 |
+| PUBLIC_ORIGIN | 当前为 https://sse.qinsbro.com；只接受不带路径、凭据、查询和片段的来源地址 |
 | DATA_DIR | 项目目录下的 .data；应持久保存且不公开 |
 | TRUST_LOCAL_PROXY | 默认关闭；仅本机回环代理且覆写 X-Forwarded-For 时可设为 1 |
 
 本地开发默认允许 http://localhost:3000 和 http://127.0.0.1:3000。
-Codespaces 开发环境会根据平台环境变量加入其转发地址，但仍需显式 HOST=0.0.0.0 才能转发。
 PUBLIC_ORIGIN 的 https 是浏览器入口；Nginx 到游戏内部仍可使用 HTTP。
 
 注意：Docker 端口映射后，游戏看到的 Nginx 来源地址通常是 Docker 网桥地址而非回环地址。
@@ -72,11 +89,11 @@ compose.yaml 仅绑定 127.0.0.1:13000，不占用现有 80/443/8443。
 镜像升级不应删除数据卷；不要使用 docker compose down -v。
 
 compose.yaml 只引用 GAME_IMAGE 指定的已发布镜像，没有本机构建入口。
-复制 .env.example 为 .env，填写实际域名及成功 Actions 运行输出的镜像版本，拉取并启动即可。
+按 [VPS 部署命令](vps-deployment.md) 下载 Compose 和环境模板，检查 .env 中的域名和镜像版本，再拉取启动。
 .github/workflows/docker.yml 在 GitHub 官方 ARM64 runner 构建和检查后发布 GHCR，
 支持手动触发及推送 main/security-hardening 分支触发，不需要 VPS SSH 密钥。
 各第三方 Action 已固定为经官方仓库核对的提交 SHA，更新版本时需要主动检查。
-完整操作和首次包可见性设置见 vps-deployment.md。
+完整操作见 [VPS 部署命令](vps-deployment.md)。
 
 ## 现有 REALITY / Nginx 接入
 
@@ -117,4 +134,67 @@ compose.yaml 只引用 GAME_IMAGE 指定的已发布镜像，没有本机构建�
 保留安全修改与 Docker 配置为独立提交，更新时先合并上游，再对照变更检查 online-rules.js
 与前端游戏规则的一致性。上游改变规则时不能只更新前端而不更新服务端。
 不要把 .env、证书、SSH 密钥、排行榜数据或节点配置提交到 Git。
-每次发布记录代码提交及镜像 digest，保留上一镜像和数据备份用于回滚。
+每次发布记录代码提交及镜像 digest，保留上一镜像和数据备份用于回滚。当前完成情况和操作如下。
+
+### 哪些已自动记录
+
+- Git 保存源码提交；Actions Summary 写入构建的代码提交 SHA 和镜像标签。
+- 镜像内的 `org.opencontainers.image.revision` 标签保存构建时的代码提交 SHA。
+- `docker push` 日志包含镜像 digest，但当前工作流没有把 digest 汇总到 Summary，也没有自动创建 GitHub Release。
+- Git 不保存 VPS 排行榜、环境文件或实际部署版本。文档中的备份命令必须在 VPS 手动执行，当前没有自动备份任务。
+- 文档提交不触发构建，因此 GitHub 分支的最新提交不一定是当前镜像使用的代码提交；以镜像标签和对应 Actions 为准。
+
+### 在 VPS 记录当前运行版本
+
+在更新前执行一次，成功更新并验证后再执行一次。整块复制到 VPS 的 SSH 终端；
+命令只读取运行容器和本地镜像信息，写入私有 backups 目录，不重启服务、不构建、不备份排行榜。
+
+```bash
+(
+  set -eu
+  umask 077
+  cd /home/ubuntu/bible-game-online
+  mkdir -p backups
+  chmod 700 backups
+  GAME_CONTAINER_ID="$(sudo docker compose ps -q game)"
+  test -n "$GAME_CONTAINER_ID"
+  GAME_IMAGE_ID="$(sudo docker inspect --format '{{.Image}}' "$GAME_CONTAINER_ID")"
+  GAME_SOURCE_SHA="$(sudo docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$GAME_IMAGE_ID")"
+  GAME_REPO_DIGESTS="$(sudo docker image inspect --format '{{json .RepoDigests}}' "$GAME_IMAGE_ID")"
+  test -n "$GAME_SOURCE_SHA"
+  test "$GAME_SOURCE_SHA" != '<no value>'
+  test "$GAME_REPO_DIGESTS" != '[]'
+  test "$GAME_REPO_DIGESTS" != 'null'
+  GAME_RECORD="backups/release-$(date -u +%Y%m%dT%H%M%S)-$$.txt"
+  {
+    date -u '+recorded_at=%Y-%m-%dT%H:%M:%SZ'
+    printf 'source_commit=%s\n' "$GAME_SOURCE_SHA"
+    printf 'image_id=%s\n' "$GAME_IMAGE_ID"
+    printf 'repo_digests=%s\n' "$GAME_REPO_DIGESTS"
+    sudo docker inspect --format 'configured_image={{.Config.Image}}' "$GAME_CONTAINER_ID"
+  } > "$GAME_RECORD.download"
+  mv "$GAME_RECORD.download" "$GAME_RECORD"
+  cat "$GAME_RECORD"
+)
+```
+
+`repo_digests` 中的 `ghcr.io/...@sha256:...` 是可用于 .env 的精确镜像引用；
+`image_id` 是本地镜像 ID，不能代替仓库 digest 来拉取镜像。
+记录文件格式说明见 [Docker image inspect](https://docs.docker.com/reference/cli/docker/image/inspect/)。
+
+### 更新与回滚时还要做什么
+
+1. 更新前按 [部署命令第 12 节](vps-deployment.md#12-备份并更新镜像) 备份 .env、Compose 和排行榜，再修改 GAME_IMAGE。
+2. 保留上一版本在 GHCR 的镜像和 VPS 上的本地镜像，不执行镜像清理；版本记录本身不会防止镜像被删除。
+3. 需要不依赖 GHCR 的离线回滚时，可另外导出旧镜像；这会占用磁盘，当前未自动执行。
+4. 将数据备份安全复制到另一台设备；只存在同一 VPS 上的备份不能防范整机丢失。
+5. 回滚代码按第 13 节把 GAME_IMAGE 改回记录的旧仓库 digest。仅更换镜像不会恢复旧排行榜；数据恢复需停止写入，保留当前数据，再核对格式并恢复备份。
+
+现有已发布镜像的对应关系（源码版本，不是最新文档版本）：
+
+| 项目 | 值 |
+| --- | --- |
+| 代码提交 | `6305b4006259920444eeea6cebfd9a13d797b577` |
+| 镜像标签 | `ghcr.io/dmcdark/bible-game-online:build-39085806588-1` |
+| 镜像 digest | `sha256:bf96e3253f4c2cb1b43e3778aaba3d89c1e2ca2da47e1554d99841c3a931622f` |
+| Actions | https://github.com/dmcdark/Bible-Game-Online/actions/runs/39085806588 |
