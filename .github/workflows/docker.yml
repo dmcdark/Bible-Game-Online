@@ -1,0 +1,146 @@
+name: Build and publish ARM64 image
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, security-hardening]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    env:
+      LOCAL_IMAGE: bible-game-online:ci
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set image name
+        id: image
+        shell: bash
+        run: |
+          echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          echo "tag=build-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+          case "$GITHUB_REF" in
+            refs/heads/main) echo 'channel=latest' >> "$GITHUB_OUTPUT" ;;
+            refs/heads/security-hardening) echo 'channel=security-hardening' >> "$GITHUB_OUTPUT" ;;
+            *) echo 'Only main and security-hardening can publish images.' >&2; exit 1 ;;
+          esac
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - name: Build ARM64 image without publishing
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          platforms: linux/arm64
+          load: true
+          push: false
+          tags: ${{ env.LOCAL_IMAGE }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=ISC
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Check JavaScript syntax and game rules
+        shell: bash
+        run: |
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
+            --workdir /source "$LOCAL_IMAGE" sh -ec '
+              for source_file in server.js online-rules.js ui-actions.js pilgrim-progress/game.js seventy-disciples/game.js tests/container-smoke.js; do
+                node --check "$source_file"
+              done
+              node --test tests/online-rules.test.js
+            '
+
+      - name: Start a restricted test container
+        shell: bash
+        run: |
+          docker run --detach --name bible-game-smoke --init --network none \
+            --read-only --cap-drop ALL --security-opt no-new-privileges:true \
+            --memory 384m --cpus 1 --pids-limit 64 \
+            --tmpfs /app/.data:rw,nosuid,noexec,size=16m,uid=1000,gid=1000 \
+            --env PUBLIC_ORIGIN=http://localhost:3000 "$LOCAL_IMAGE"
+
+      - name: Check HTTP, leaderboard and multiplayer permissions
+        shell: bash
+        run: |
+          docker run --rm --network container:bible-game-smoke \
+            --read-only --cap-drop ALL --security-opt no-new-privileges:true \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
+            --workdir /source "$LOCAL_IMAGE" node tests/container-smoke.js
+
+      - name: Check dependency advisories
+        shell: bash
+        run: |
+          docker run --rm --read-only --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --tmpfs /tmp:rw,nosuid,noexec,size=64m,uid=1000,gid=1000 \
+            --env npm_config_cache=/tmp/npm-cache \
+            "$LOCAL_IMAGE" npm audit --omit=dev --audit-level=high
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish the checked image
+        env:
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
+          IMAGE_TAG: ${{ steps.image.outputs.tag }}
+          IMAGE_CHANNEL: ${{ steps.image.outputs.channel }}
+        shell: bash
+        run: |
+          image_ref="$IMAGE_NAME:$IMAGE_TAG"
+          docker tag "$LOCAL_IMAGE" "$image_ref"
+          docker push "$image_ref"
+          channel_ref="$IMAGE_NAME:$IMAGE_CHANNEL"
+          docker tag "$LOCAL_IMAGE" "$channel_ref"
+          docker push "$channel_ref"
+          {
+            echo '## ARM64 image published'
+            echo
+            echo "Source commit: \`$GITHUB_SHA\`"
+            echo
+            echo 'Set GAME_IMAGE once to follow this branch on future pulls:'
+            echo '```dotenv'
+            echo "GAME_IMAGE=$channel_ref"
+            echo '```'
+            echo
+            echo "Versioned image for pinning or rollback: \`$image_ref\`"
+            echo
+            echo 'Run docker compose pull, then docker compose up -d --no-build --wait --wait-timeout 60 to apply an update.'
+            echo
+            echo 'On first publication, check the GHCR package visibility. Public repository does not automatically mean public package.'
+            echo 'Security notes: docs/security-and-deployment.md'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Test container logs
+        if: failure()
+        run: docker logs --tail 100 bible-game-smoke || true
+
+      - name: Remove test container
+        if: always()
+        run: docker rm -f bible-game-smoke || true

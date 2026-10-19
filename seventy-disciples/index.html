@@ -124,7 +124,7 @@
     <div class="modal-window tech-window">
       <div class="modal-header">
         <h2>属灵双轨发展树</h2>
-        <button class="close-btn" onclick="document.getElementById('modal-tech').classList.remove('active')">✕</button>
+        <button class="close-btn" data-close-modal="modal-tech">✕</button>
       </div>
       <div class="tech-trees-container">
         <div class="tech-column">
@@ -146,7 +146,7 @@
     <div class="modal-window" style="width:680px;">
       <div class="modal-header">
         <h2>招募与委派历史同工</h2>
-        <button class="close-btn" onclick="document.getElementById('modal-coworkers').classList.remove('active')">✕</button>
+        <button class="close-btn" data-close-modal="modal-coworkers">✕</button>
       </div>
       <p style="font-size:0.8rem;color:#554433;margin-bottom:12px;">随着门徒群体的增长与物资储备的丰富，可以招募使徒时代的著名同工随队协助或按立驻守牧养各地教会。</p>
       <div id="coworker-market-grid" class="coworker-grid"></div>
@@ -158,7 +158,7 @@
     <div class="modal-window" style="width:640px;">
       <div class="modal-header">
         <h2>三大使徒异象胜利目标</h2>
-        <button class="close-btn" onclick="document.getElementById('modal-victory').classList.remove('active')">✕</button>
+        <button class="close-btn" data-close-modal="modal-victory">✕</button>
       </div>
       <div class="victory-routes-container">
         <div class="victory-card">
@@ -190,11 +190,12 @@
       <h3 id="chronicle-title">纪事载录</h3>
       <div class="chronicle-body" id="chronicle-content"></div>
       <div class="chronicle-changes" id="chronicle-changes"></div>
-      <button id="chronicle-confirm-btn" onclick="document.getElementById('modal-chronicle').classList.remove('active')">✦ 阿们 · 记在心上 ✦</button>
+      <button id="chronicle-confirm-btn" data-close-modal="modal-chronicle">✦ 阿们 · 记在心上 ✦</button>
     </div>
   </div>
 
   <script src="data.js"></script>
+  <script src="/ui-actions.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

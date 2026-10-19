@@ -31,8 +31,25 @@ let soloTimerInterval = null;
 let socket = null;
 let onlineRoomCode = null;
 let mySocketId = null;
+let onlineTurnId = null;
 let currentRollContext = null;
 let turnActionLogs = [];
+
+// Dynamic strings used inside HTML templates must never become markup.
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, character => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[character]);
+}
+
+function safeColor(value) {
+  return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value : "#495057";
+}
+
+function emitTurn(event, data = {}) {
+  if (!socket?.connected || !onlineRoomCode || !onlineTurnId) return;
+  socket.emit(event, { ...data, roomCode: onlineRoomCode, turnId: onlineTurnId });
+}
 
 // 1. 初始化加载
 window.addEventListener("DOMContentLoaded", async () => {
@@ -63,6 +80,7 @@ function getMyPlayerObj() {
 // 判断当前客户端是否为本回合行动者
 function isMyTurnToAct() {
   if (gameMode !== "online") return true;
+  if (!onlineRoomCode) return false;
   const curP = players[activePlayerIndex];
   return curP && curP.socketId === mySocketId;
 }
@@ -95,7 +113,7 @@ function initSocketConnection() {
       const div = document.createElement("div");
       div.className = "leader-item";
       div.innerHTML = `
-        <span><span class="roster-color-dot" style="background:${p.color}"></span><strong>${p.name}</strong> ${p.socketId === room.hostId ? "（房主）" : ""}</span>
+        <span><span class="roster-color-dot" style="background:${safeColor(p.color)}"></span><strong>${escapeHTML(p.name)}</strong> ${p.socketId === room.hostId ? "（房主）" : ""}</span>
         <span>${p.socketId === mySocketId ? "👉 你自己" : "已就绪"}</span>
       `;
       listEl.appendChild(div);
@@ -112,6 +130,7 @@ function initSocketConnection() {
 
   socket.on("onlineGameStarted", (room) => {
     gameMode = "online";
+    onlineTurnId = room.turnId;
     players = room.players;
     activePlayerIndex = 0;
     currentRound = 1;
@@ -149,7 +168,8 @@ function initSocketConnection() {
     if (curP) executeStepResolutionLocally(curP, stepType);
   });
 
-  socket.on("syncNextTurn", ({ playersState, logsToAdd, firstFinished }) => {
+  socket.on("syncNextTurn", ({ playersState, logsToAdd, firstFinished, turnId }) => {
+    onlineTurnId = turnId;
     players = playersState;
     if (firstFinished && !isFirstPlayerFinished) {
       isFirstPlayerFinished = true;
@@ -163,6 +183,25 @@ function initSocketConnection() {
   socket.on("playerLeftNotice", (msg) => {
     log(`⚠️ ${msg}`);
   });
+
+  socket.on("connect_error", () => {
+    const errEl = document.getElementById("online-error-msg");
+    if (errEl) errEl.textContent = "无法连接联机服务器，请稍后重试。";
+  });
+
+  let sessionEnded = false;
+  function endOnlineSession(message) {
+    if (sessionEnded) return;
+    if (gameMode !== "online" && !onlineRoomCode) return;
+    sessionEnded = true;
+    onlineTurnId = null;
+    onlineRoomCode = null;
+    socket.disconnect();
+    document.getElementById("roll-btn").disabled = true;
+    showDialog("联机已结束", message, [{ label: "返回大厅", onClick: () => location.reload() }]);
+  }
+  socket.on("roomClosed", message => endOnlineSession(message));
+  socket.on("disconnect", () => endOnlineSession("连接已断开，本局无法恢复，请返回大厅重新加入。"));
 }
 
 // 2. 开局大厅选项卡与设置
@@ -490,11 +529,7 @@ function handleRollDice() {
   document.getElementById("roll-btn").disabled = true;
 
   if (gameMode === "online") {
-    socket.emit("requestRoll", {
-      roomCode: onlineRoomCode,
-      qLen: questionsData.length,
-      cLen: cardsData.length
-    });
+    emitTurn("requestRoll");
   } else {
     const diceVal = Math.floor(Math.random() * 6) + 1;
     currentRollContext = {
@@ -540,6 +575,7 @@ function performRollAnimationAndMove(diceVal) {
   diceEl.className = "dice rolling";
 
   setTimeout(() => {
+    if (gameMode === "online" && !onlineRoomCode) return;
     diceEl.className = `dice show-${diceVal}`;
     document.getElementById("roll-status").textContent = `${curP.name} 掷出了 ${diceVal} 点！`;
     log(`${curP.name} 投掷出 ${diceVal} 点。`);
@@ -550,6 +586,7 @@ function performRollAnimationAndMove(diceVal) {
 // 6. 逐格跳动
 async function movePlayerStepByStep(player, steps) {
   for (let i = 0; i < steps; i++) {
+    if (gameMode === "online" && !onlineRoomCode) return;
     if (player.position >= 70) break;
     player.position += 1;
     renderPieces();
@@ -564,6 +601,7 @@ async function movePlayerStepByStep(player, steps) {
     await new Promise(r => setTimeout(r, 60));
   }
 
+  if (gameMode === "online" && !onlineRoomCode) return;
   if (player.position >= 70) {
     player.position = 70;
     player.hasReachedGoal = true;
@@ -585,7 +623,7 @@ async function movePlayerStepByStep(player, steps) {
 // 触发步骤确认（联机模式下通知全员同频执行，单机下直接执行）
 function triggerStepResolution(player, stepType) {
   if (gameMode === "online" && socket) {
-    socket.emit("broadcastResolveStep", { roomCode: onlineRoomCode, stepType });
+    emitTurn("broadcastResolveStep", { stepType });
   } else {
     executeStepResolutionLocally(player, stepType);
   }
@@ -707,7 +745,7 @@ function triggerScriptureQuestion(player) {
   const isTurnOwner = isMyTurnToAct();
 
   const content = document.createElement("div");
-  content.innerHTML = `<p style="font-weight:bold;margin-bottom:12px;">${q.question}</p>`;
+  content.innerHTML = `<p style="font-weight:bold;margin-bottom:12px;">${escapeHTML(q.question)}</p>`;
 
   const optContainer = document.createElement("div");
   optContainer.className = "options-list";
@@ -719,7 +757,7 @@ function triggerScriptureQuestion(player) {
 
     // 选项文本 + 右侧圆圈 +n 徽章
     btn.innerHTML = `
-      <span class="option-text">${["A", "B", "C", "D"][idx]}. ${optText}</span>
+      <span class="option-text">${["A", "B", "C", "D"][idx]}. ${escapeHTML(optText)}</span>
       <span class="option-hint-badge" id="q-opt-badge-${idx}"></span>
     `;
 
@@ -727,7 +765,7 @@ function triggerScriptureQuestion(player) {
       if (isTurnOwner) {
         // 当前回合玩家点击：正式提交答案（联机下通知全员同步弹出对错窗口）
         if (gameMode === "online" && socket) {
-          socket.emit("broadcastQuestionResult", { roomCode: onlineRoomCode, chosenIdx: idx });
+          emitTurn("broadcastQuestionResult", { chosenIdx: idx });
         } else {
           resolveQuestionAnswerLocally(player, idx);
         }
@@ -735,12 +773,7 @@ function triggerScriptureQuestion(player) {
         // 场外其他玩家点击：发送自己颜色的高亮提示 (+n)
         const me = getMyPlayerObj();
         if (me) {
-          socket.emit("sendOptionHint", {
-            roomCode: onlineRoomCode,
-            optionIdx: idx,
-            playerColor: me.color,
-            playerName: me.name
-          });
+          emitTurn("sendOptionHint", { optionIdx: idx });
         }
       }
     };
@@ -899,12 +932,7 @@ function checkFaithStatus(player) {
 // 10. 回合完成同步与切换
 function completeTurnAndSync() {
   if (gameMode === "online" && socket) {
-    socket.emit("finishTurnAction", {
-      roomCode: onlineRoomCode,
-      playersState: players,
-      logsToAdd: turnActionLogs,
-      firstFinished: isFirstPlayerFinished
-    });
+    emitTurn("finishTurnAction", { logsToAdd: turnActionLogs });
   } else {
     turnActionLogs.forEach(m => log(m));
     advanceTurnLocally();
@@ -965,8 +993,8 @@ async function finishGameAndShowLeaderboard() {
     const item = document.createElement("div");
     item.className = "leader-item";
     item.innerHTML = `
-      <span>第 ${rank + 1} 名：<strong style="color:${p.color}">${p.name}</strong> ${p.position >= 70 ? "（抵达成圣之城）" : `（驻足第${p.position}格）`}</span>
-      <span>最终信心分：<strong>${p.faith}</strong> 点</span>
+      <span>第 ${rank + 1} 名：<strong style="color:${safeColor(p.color)}">${escapeHTML(p.name)}</strong> ${p.position >= 70 ? "（抵达成圣之城）" : `（驻足第${escapeHTML(p.position)}格）`}</span>
+      <span>最终信心分：<strong>${escapeHTML(p.faith)}</strong> 点</span>
     `;
     container.appendChild(item);
   });
@@ -1018,8 +1046,8 @@ async function showSoloLeaderboardModal(latestRecord = null) {
       item.className = "leader-item";
       const medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `第 ${idx + 1} 名`;
       item.innerHTML = `
-        <span><strong>${medal} · ${r.name}</strong> <small style="color:#7a6351">(${r.date || "今日"})</small></span>
-        <span>信心: <strong>${r.faith}</strong> | <strong>${r.rounds}</strong> 轮 | ⏱️ ${formatDuration(r.durationSec || 0)}</span>
+        <span><strong>${medal} · ${escapeHTML(r.name)}</strong> <small style="color:#7a6351">(${escapeHTML(r.date || "今日")})</small></span>
+        <span>信心: <strong>${escapeHTML(r.faith)}</strong> | <strong>${escapeHTML(r.rounds)}</strong> 轮 | ⏱️ ${escapeHTML(formatDuration(r.durationSec || 0))}</span>
       `;
       container.appendChild(item);
     });
@@ -1054,11 +1082,11 @@ function updateUI() {
     card.title = "点击定位该玩家棋子位置";
     card.innerHTML = `
       <div>
-        <span class="roster-color-dot" style="background:${p.color}"></span>
-        <strong>${p.name}</strong>
+        <span class="roster-color-dot" style="background:${safeColor(p.color)}"></span>
+        <strong>${escapeHTML(p.name)}</strong>
       </div>
       <div>
-        格: ${p.position}/70 | 信心: <strong>${p.faith}</strong>
+        格: ${escapeHTML(p.position)}/70 | 信心: <strong>${escapeHTML(p.faith)}</strong>
         ${p.isFasting ? '<span class="status-fasting">[禁食中]</span>' : ""}
       </div>
     `;

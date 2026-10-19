@@ -1,0 +1,10 @@
+.git
+.github
+node_modules
+.data
+.env
+.env.*
+leaderboard.json
+tests
+docs
+*.log
